@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<head>
+    <script type="text/javascript" src="config.js"></script>
+    <script type="text/javascript" src="lib/react.js"></script>
+    <script type="text/javascript" src="build/game.js"></script>
+    <script type="text/javascript" src="build/client.js"></script>
+    <script type="text/javascript">
+
+    </script>
+    <style type="text/css">
+
+  .nest[data-player="0"] .piece_poly--inner, 
+  .piece[data-player="0"] .piece_poly--inner { fill: white; }
+  .nest[data-player="1"] .piece_poly--inner, 
+  .piece[data-player="1"] .piece_poly--inner { fill: black; }
+  .nest--activePlayer {
+    stroke: pink;
+  }
+
+  .piece[data-type=MOTHERSHIP] .piece_poly--outer { fill: gold; }
+  .piece[data-type=HOPPER]     .piece_poly--outer { fill: limegreen; }
+  .piece[data-type=SPIDER]     .piece_poly--outer { fill: peru; }
+  .piece[data-type=SCOUT]      .piece_poly--outer { fill: royalblue; }
+  .piece[data-type=CRAWLER]    .piece_poly--outer { fill: purple; }
+  .piece[data-type=SHIFTER]    .piece_poly--outer { fill: grey; }
+
+  /* these need to be renamed */
+  .piece[data-type=pillbug]     .piece_poly--outer { fill: lightgray; }
+  .piece[data-type=ladybug]     .piece_poly--outer { fill: red; }
+
+  .moveSlot .piece_poly--outer,
+  .putSlot .piece_poly--outer {
+    fill: none;
+    stroke: gray;
+  }
+  .moveSlot text,
+  .putSlot text {
+    fill: gray;
+    dominant-baseline: central;
+  }
+
+
+    </style>
+</head>
+<body onload="onPageLoad()">
+    <div id="pageBody">
+        
+    </div>
+</body>

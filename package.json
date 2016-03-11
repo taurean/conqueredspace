@@ -1,0 +1,17 @@
+{
+  "name": "conquered.space_client",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {},
+  "devDependencies": {
+    "babel-preset-es2015": "^6.5.0",
+    "babel-preset-react": "^6.5.0"
+  },
+  "scripts": {
+    "watch": "babel --presets es2015,react --watch src/ --out-dir build/",
+    "build": "babel --presets es2015,react src/ --out-dir build/"
+  },
+  "author": "",
+  "license": "ISC"
+}
