@@ -56,6 +56,7 @@ var GAME_ACTIONS = {
   LOAD:       "LOAD",
   LOAD_MOVES: "LOAD_MOVES",
   SELECT_TILE: "SELECT_TILE",
+  DESELECT_TILE: "DESELECT_TILE",
   JOIN:       "JOIN",
   RESIGN:     "RESIGN",
   MOVE:       "MOVE",
@@ -157,6 +158,9 @@ function gameReduxer(state, action) {
       };
       return newState;
     } break;
+    case GAME_ACTIONS.DESELECT_TILE: {
+      return assign({}, state, { selected: null });
+    }
     case GAME_ACTIONS.JOIN: {
       var newState = assign({ }, state);
       var player = state.playersById[action.playerId];
@@ -417,7 +421,7 @@ var Tile = React.createClass({
   render: function() {
     var props = this.props;
     var className = format("piece piece--z$1", props.z);
-    var selectedTile = globalStore.getState().gameView.selected;
+    var selectedTile = gameStore.getState().selected;
     if (selectedTile && selectedTile.on == props.on &&
       selectedTile.x == props.x && 
       selectedTile.y == props.y && 
@@ -478,7 +482,7 @@ var GameBoard = React.createClass({
   },
   onClickTile: function(e) {
     var t = e.currentTarget;
-    globalStore.dispatch({
+    gameStore.dispatch({
       type: GAME_ACTIONS.SELECT_TILE,
       on: "board",
       shipType: t.getAttribute('data-type'),
@@ -492,7 +496,7 @@ var GameBoard = React.createClass({
   onClickNestTile: function(e) {
     console.log('clicked a tile in the nest', arguments);
     var t = e.currentTarget;
-    globalStore.dispatch({
+    gameStore.dispatch({
       type: GAME_ACTIONS.SELECT_TILE,
       on: "nest",
       shipType: t.getAttribute('data-type'),
@@ -507,13 +511,16 @@ var GameBoard = React.createClass({
     var session = globalStore.getState().session;
     var t = e.currentTarget;
     var sel = this.props.selected;
+    var selPlayer = this.props.playersById[sel.player];
     var gameId = this.props.id;
     if (sel.player == currentPlayer.order &&
       session.user.id == currentPlayer.id) {
+
+      gameStore.dispatch({ type: GAME_ACTIONS.DESELECT_TILE });
       
       var to = [parseInt(t.getAttribute('data-x')),
         parseInt(t.getAttribute('data-y'))];
-      globalStore.dispatch(function(dispatch){
+      gameStore.dispatch(function(dispatch){
         /*
         We optimistically update the board immediately. If it turns out 
         storing the board failed, we just reload the latest known state.
@@ -552,7 +559,7 @@ var GameBoard = React.createClass({
               error: data
             });
           }
-        }, authHeader(session.tokenString));
+        }, authHeader(globalStore.getState()));
       });
     }
   },
@@ -594,7 +601,7 @@ var GameBoard = React.createClass({
     if (props.selected) {
       var sel = props.selected;
       if (sel.on == "board") {
-        slots = getMoveSlots(props.spatialMap, [sel.x, sel.y]);
+        slots = getMoveSlots(props.spatialMap, [parseInt(sel.x), parseInt(sel.y)]);
       } else if (sel.on == "nest") {
         slots = getPutSlots(props.spatialMap, sel.player);
       } else {
