@@ -183,12 +183,16 @@ function trieWalkKeys(node, prefix) {
 ///
 
 var ACTIONS = {
+  REPLY_GAME_REQUEST: "REPLY_GAME_REQUEST",
+  REPLY_GAME_REQUEST_FAILED: "REPLY_GAME_REQUEST_FAILED",
+
   INVALIDATE_GAME_VIEW: 'INVALIDATE_GAME_VIEW',
   ROUTE: "ROUTE",
   RUN_POLLING: "RUN_POLLING",
   POLL: "POLL",
   POLL_SUCCESS: "POLL_SUCCESS",
   POLL_FAILED: "POLL_FAILED",
+  POLLING_STOPPED: "POLLING_STOPPED",
   LOG_OUT: "LOG_OUT",
   LOGGING_IN: "LOGGING_IN",
   LOG_IN_SUCCESFUL: "LOG_IN_SUCCESFUL",
@@ -284,6 +288,11 @@ function rootReduxer(state, action) {
     newState.pollStatus.errors = action.errors;
     return newState;
 
+  case ACTIONS.POLLING_STOPPED:
+    var newState = assign({}, state);
+    newState.pollStatus = assign({}, state.pollStatus, { polling: false });
+    return newState;
+
   case ACTIONS.LOG_OUT:
     var newState = assign({}, state);
     newState.session = assign({}, initialState.session);
@@ -309,17 +318,16 @@ function rootReduxer(state, action) {
     newState.session.error = action.error;
     return newState;
 
-  case ACTIONS.REJECT_GAME_REQUEST:
-  case ACTIONS.ACCEPT_GAME_REQUEST:
+  case ACTIONS.REPLY_GAME_REQUEST:
     // this is an optimistic action.
     var newState = assign({}, state);
-    var moveType = action.type == ACTIONS.ACCEPT_GAME_REQUEST ?
-      MOVES.JOIN : MOVES.RESIGN;
+    var moveType = action.moveType;
     newState.games[action.gameId].moves.push({
       type: moveType, playerId: newState.session.user.id });
 
     return newState;
 
+  case ACTIONS.REPLY_GAME_REQUEST_FAILED:
   case ACTIONS.MARKING_NOTIFICATION_FAILED:
   case ACTIONS.MOVE_FAILED:
     var newState = assign({}, state);
@@ -331,7 +339,7 @@ function rootReduxer(state, action) {
     var newState = assign({}, state);
     newState.notifications[action.id].read = true;
     return state;
-   
+  
   case ACTIONS.INVALIDATE_GAME_VIEW:
     var newState = assign({}, state);
     newState.errors.push(action.error);
@@ -446,7 +454,11 @@ function initPollSystem(store) {
   store.subscribe(function(state, dispatch, action) {
     switch(action.type) {
     case ACTIONS.LOG_IN_SUCCESFUL: {
-      assert(pollIntervalHandle === null);
+      //assert(pollIntervalHandle === null);
+      if (pollIntervalHandle !== null) {
+        clearInterval(pollIntervalHandle);
+        console.warn("starting poll while there was an active poll interval");
+      }
 
       dispatch({ type: ACTIONS.RUN_POLLING });
       pollIntervalHandle = setInterval(poll, POLL_DT);
@@ -462,6 +474,24 @@ function initPollSystem(store) {
     } break;
     }
   });
+}
+
+
+///
+/// SOMETHING
+///
+
+
+function requestGame(store, invitee) {
+  var session = store.getState().session;
+  if (typeof invitee != "undefined") {
+    var dest = urls.userGames(session.userId);
+    POST(dest, { invitees: invitee, access_token: session.tokenString }, function() {
+      console.log("game request against " + invitee + " posted with results:", arguments )
+    });
+  } else {
+    /// TODO: support for random opponents
+  }
 }
 
 
@@ -484,43 +514,101 @@ var RouteLink = React.createClass({
   }
 });
 
-var Router = React.createClass({
-  componentWillMount: function() {
-    this.buildRoutes();
+function initRouteSystem(store, routes, specialRoutes) {
+  //var router = buildRoutes(routes);
+  var currentPath = store.getState().routePath;
+  var newPath = location.href.substr(document.baseURI.length);
+  store.dispatch({ type: ACTIONS.ROUTE, path: newPath });
+  store.subscribe(function(state, dispatch, action) {
+    if(action.type === ACTIONS.ROUTE && state.routePath != currentPath) {
+      history.pushState({}, "", state.routePath);
+    }
+  });
+
+}
+
+var gameStore = createStore(gameReduxer);
+
+var GameView = React.createClass({
+  getInitialState: function() {
+    return { counter: 0 };
   },
+  componentWillMount: function(){
+    var self = this;
+    function updateViewStore(appState, viewStore) {
+      var id = self.props.id;
+      var gameData = appState.games[id];
+      var viewState = viewStore.getState();
+      if (viewState.id != id || viewState.lastMoveCreated < peek(gameData.moves).created) {
+        var playersById = {};
+        for (var i = 0; i < gameData.players.length; ++i) {
+          var pid = gameData.players[i];
+          playersById[pid] = assign({}, appState.users[pid]);
+        }
+        viewStore.dispatch({
+          type: GAME_ACTIONS.LOAD,
+          id: id,
+          moves: gameData.moves,
+          playersById: playersById
+        });
+        // } else if (gameView.lastMoveCreated < peek(data.moves).created) {
+        //   var newMoves = [];
+        //   for (var i = 0; i < data.moves.length; ++i) {
+        //     if (gameView.lastMoveCreated < data.moves[i].created)
+        //       newMoves.push(data.moves[i]);
+        //   }
+        //   globalStore.dispatch({
+        //     type: GAME_ACTIONS.LOAD_MOVES,
+        //     moves: newMoves
+        //   });
+      }
+    }
+
+    this.updateCBHandle = globalStore.subscribe(function(state, dispatch, action) {
+      updateViewStore(state, self.props.store);
+    });
+    this.redrawHandle = gameStore.subscribe(function() {
+      self.setState({counter: self.state.counter + 1});
+    });
+    updateViewStore(globalStore.getState(), self.props.store);
+  },
+  componentWillUnmount: function() {
+    if (this.updateCBHandle) this.updateCBHandle();
+  },
+  render: function() {
+    return (<div>
+        <GameBoard {...this.props.store.getState()} />
+      </div>);
+  }
+});
+
+var DashboardView = React.createClass({
+  requestGame: function(invitee) { requestGame(globalStore, invitee); },
+ 
+  render: function() {
+    var state = globalStore.getState();
+    var games = mapOver(state.session.gameIds, function(id) { return state.games[id]; });
+ 
+    return (
+      <div>
+        <GameListing games={games} />
+        <h2>Request new game</h2>
+        <GameRequestForm onSubmit={this.requestGame} />
+      </div>);
+  }
+});
+
+var Router = React.createClass({
+
+  componentWillMount: function() { this.buildRoutes(); },
   routeTrie: null,
   routes: {
     "games/*": function(params) {
-      var state = globalStore.getState();
-      var gameView = state.gameView;
-      var id = parseInt(params[0]);
-      var data = state.games[id];
-      if (gameView.id != id || gameView.lastMoveCreated < peek(data.moves).created) {
-        var playersById = {};
-        for (var i = 0; i < data.players.length; ++i) {
-          var pid = data.players[i];
-          playersById[pid] = assign({}, state.users[pid]);
-        }
-        globalStore.dispatch({
-          type: GAME_ACTIONS.LOAD,
-          id: id,
-          moves: data.moves,
-          playersById: playersById
-        });
-      // } else if (gameView.lastMoveCreated < peek(data.moves).created) {
-      //   var newMoves = [];
-      //   for (var i = 0; i < data.moves.length; ++i) {
-      //     if (gameView.lastMoveCreated < data.moves[i].created)
-      //       newMoves.push(data.moves[i]);
-      //   }
-      //   globalStore.dispatch({
-      //     type: GAME_ACTIONS.LOAD_MOVES,
-      //     moves: newMoves
-      //   });
-      }
-
-      return (<GameBoard {...globalStore.getState().gameView} />);
+      return <GameView id={parseInt(params[0])} store={gameStore} />
     },
+  },
+  specialRoutes: {
+    default: function() { return <DashboardView /> }
   },
   buildRoutes: function() {
     this.routeTrie = { children: { } };
@@ -577,8 +665,31 @@ var Router = React.createClass({
         return null;
       }
     } else {
-      return null;
+      return this.specialRoutes.default();
     }
+  }
+});
+
+
+var TopMenu = React.createClass({
+  render: function() {
+    var path = globalStore.getState().routePath;
+    var options = [
+      {
+        label: 'dashboard',
+        path: ''
+      },
+      {
+        label: 'rules',
+        path: 'rules'
+      }
+    ];
+
+    return (<ul className="topMenu">
+        {options.map(i => <li className={"menu-item" + (i.path==path) ? " menu-item--active" : ""}>
+            <RouteLink path={i.path}>{i.label}</RouteLink>
+          </li>)}
+      </ul>);
   }
 });
 
@@ -593,22 +704,78 @@ var SaveFormMixin = {
   }
 };
 
+
+var ErrorList = React.createClass({
+  render: function() {
+    if (this.props.errors) {
+      var className = "errors errors-" + this.props.field;
+      return (<ul className={className}>
+          {this.props.errors.map(e => <li className="error">{e}</li>)}
+        </ul>)
+    } else {
+      return null;
+    }
+  }
+});
 var UserCreationForm = React.createClass({
   mixins: [SaveFormMixin],
+  getInitialState: function() {return { errors: {} }; },
   handleSubmit: function(event) {
+    var self = this;
     event.preventDefault();
-    POST(urls.users, this.state, function() {
-      console.log("user should be registered")
+    POST(urls.users, this.state, function(status, data) {
+      if (statusOK(status)) {
+        console.log("user should be registered")
+        _logIn(globalStore, data);
+      } else if (status == 400) {
+        self.setState({
+          errors: JSON.parse(data)
+        });
+      } else {
+        console.log("Server error occured.");
+        self.setState({
+          errors: { form: ["The server encountered a problem."] }
+        });
+      }
       console.log(arguments);
     })
     return false;
   },
   render: function() {
+    var errs = this.state.errors;
+    if (! 'form' in errs) errs['form'] = null;
+    if (! 'email' in errs) errs['email'] = null;
+    if (! 'username' in errs) errs['username'] = null;
+    if (! 'password' in errs) errs['password'] = null;
+
     return <form>
-      <label>Username <input name="username" onChange={this.saveInputChange} /></label>
-      <label>Password <input name="password" onChange={this.saveInputChange} type="password" /></label>
-      <label>Email <input name="email" onChange={this.saveInputChange} type="email" /></label>
-      <button onClick={this.handleSubmit}>Sign Up</button>
+      {<ErrorList field="form" errors={errs['form']} />}
+      <ul className="form-fields">
+      <li className="form-field">
+        <label>
+          Username:
+          <input name="username" onChange={this.saveInputChange} required="required"/>
+        </label>
+        {<ErrorList field="form" errors={errs['username']} />}
+      </li>
+      <li className="form-field">
+        <label>
+          Password:
+          <input name="password" onChange={this.saveInputChange} type="password" required="required"/>
+        </label>
+        {<ErrorList field="form" errors={errs['password']} />}
+      </li>
+      <li className="form-field">
+        <label>
+          Email
+          <input name="email" onChange={this.saveInputChange} type="email" required="required"/>
+        </label>
+        {<ErrorList field="form" errors={errs['email']} />}
+      </li>
+      <li className="form-field">
+        <button onClick={this.handleSubmit}>Sign Up</button>
+      </li>
+      </ul>
     </form>
   }
 });
@@ -662,9 +829,7 @@ var UserSummary = React.createClass({
 
 var GameRequestForm = React.createClass({
   mixins: [SaveFormMixin],
-  getInitialState: function() {
-    return { };
-  },
+  getInitialState: function() { return {}; },
   handleSubmit: function(event) {
     event.preventDefault();
     console.log(this.state, this.props);
@@ -672,6 +837,10 @@ var GameRequestForm = React.createClass({
     return false;
   },
   render: function() {
+    var error = null;
+    if (this.props.error) {
+      error = <p className="field-error">{this.props.error.message}</p>;
+    }
     return <form onSubmit={this.handleSubmit}>
         <label>
           Opponent:
@@ -682,6 +851,7 @@ var GameRequestForm = React.createClass({
             required/>
         </label>
         <input type="submit" value="request" />
+        {error}
       </form>
   }
 });
@@ -709,12 +879,14 @@ var notificationMessages = [
 var Notification = React.createClass({
   __acceptOrRejectRequest: function(accept) {
     var gameId = this.props.parameters[0];
-    var optimisticAction = ACTIONS[accept ? "ACCEPT_GAME_REQUEST" : "REJECT_GAME_REQUEST"];
-    var failAction = accept ? ACTIONS.ACCEPT_FAILED : ACTIONS.REJECT_FAILED;
     var moveType = accept ? MOVES.JOIN : MOVES.RESIGN;
     var self = this;
 
-    globalStore.dispatch({ type: optimisticAction, gameId: gameId });
+    globalStore.dispatch({
+      type: ACTIONS.REPLY_GAME_REQUEST,
+      moveType: moveType,
+      gameId: gameId
+    });
     var state = globalStore.getState();
 
     POST(urls.gameMoves(gameId), {
@@ -725,7 +897,7 @@ var Notification = React.createClass({
           self.markNotificationRead();
         } else {
           globalStore.dispatch({
-            type: failAction,
+            type: ACTIONS.REPLY_GAME_REQUEST_FAILED,
             gameId: gameId,
             error: data
           });
@@ -871,7 +1043,9 @@ var GameRow = React.createClass({
 var GameListing = React.createClass({
   render: function() {
     return <ul className="game-listing">
-        {this.props.games.map((game) => <GameRow key={game.id} game={game} />)}
+        {this.props.games
+          .filter(game => game.started && !game.ended)
+          .map((game) => <GameRow key={game.id} game={game} />)}
       </ul>
   }
 });
@@ -914,16 +1088,6 @@ var Page = React.createClass({
   login: function(username, password, keep) { logIn(this.props.store, username, password, keep) },
   logout: function() { logOut(this.props.store); },
 
-  requestGame: function(invitee) {
-    console.log("requesting game", arguments);
-    var session = this.props.store.getState().session;
-    if (typeof invitee != "undefined") {
-      var dest = urls.userGames(session.userId);
-      POST(dest, { invitees: invitee, access_token: session.tokenString }, function() {
-        console.log("game request against " + invitee + " posted with results:", arguments )
-      });
-    }
-  },
   renderNotificationList: function(notifications) {
     return (<ol>
         {mapOver(notifications, function(n) {
@@ -937,32 +1101,33 @@ var Page = React.createClass({
   renderHomepage: function() {
     var self = this;
     var state = this.props.store.getState();
-    var games = mapOver(state.session.gameIds, function(id) { return state.games[id]; });
     var notifications = mapOver(state.session.unreadNotificationIds, function(id) { return state.notifications[id]; });
 
     return (<div>
         <div className="topbar">
-                  {this.renderNotificationList(notifications)}
+          <TopMenu />
+          {this.renderNotificationList(notifications)}
+          <button onClick={this.logout}>Log Out</button>
+          <PollIndicator store={this.props.store} />
+          <UserSummary username={state.session.username} />
+        </div>
 
         <div style={{border: "1px solid black"}}>
           <Router url={state.routePath} />
         </div>
-
-        <GameListing games={games} />
-        <h2>Request new game</h2>
-        <GameRequestForm onSubmit={this.requestGame} />
-          <button onClick={this.logout}>Log Out</button>
-          <PollIndicator store={this.props.store} />
-          <UserSummary username={state.session.username} />
-
-        </div>
-
       </div>);
   },
   renderUnauthenticated: function() {
     return <div>
-        <LoginForm onSubmit={this.login}/>
-        <UserCreationForm onSubmit={this.createUser} />
+        <p>Welcome to the pre-pre-alpha test version of <em>Conquered Space</em>. Thank you for trying us out and helping find problems. Let us know if you find any.</p>
+        <div className="login">
+          <h3>Log in</h3>
+          <LoginForm onSubmit={this.login} error={this.props.store.getState().session.error}/>
+        </div>
+        <div className="createUser">
+          <h3>Create user</h3>
+          <UserCreationForm />
+        </div>
       </div>
   },
 
@@ -981,8 +1146,9 @@ function renderPage() {
 
 var globalStore = createStore(rootReduxer);
 function onPageLoad() {
-  restoreSession(globalStore);
   initPollSystem(globalStore);
+  initRouteSystem(globalStore);
+  restoreSession(globalStore);
   globalStore.subscribe(renderPage);
   renderPage();
 }
