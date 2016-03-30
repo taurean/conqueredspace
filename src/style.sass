@@ -1,0 +1,305 @@
+/*
+“font-family: "Mercury SSm A", "Mercury SSm B";
+font-style: normal;
+font-weight: 400;”
+
+Taurean Bryant
+font-family: "Whitney A", "Whitney B";
+font-style: normal;
+font-weight: 400;
+
+Taurean Bryant
+font-family: "Whitney A", "Whitney B";
+font-style: normal;
+font-weight: 700;
+
+font-family: "Whitney Small-caps A", "Whitney Small-caps B";
+font-style: normal;
+font-weight: 400;
+
+font-family: "Whitney Small-caps A", "Whitney Small-caps B";
+font-style: normal;
+font-weight: 700; 
+*/
+
+$font-stack-sans-SC: "Whitney Small-caps A", "Whitney Small-caps B", sans-serif;
+$font-stack-sans: "Whitney A", "Whitney B", sans-serif;
+$font-stack-serif: "Mercury SSm A", "Mercury SSm B", serif;
+
+*,
+*:before,
+*:after {
+  box-sizing: border-box;
+}
+
+html, body {
+  padding: 0;
+  margin: 0;
+  background: black;
+  color: white;
+  font: 500 10px/1.5 $font-stack-sans;
+}
+
+ul, ol, li {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.topBar {
+  position: relative;
+}
+.topBar:after {
+    content: '';
+    display: block;
+    clear: both;
+}
+
+.hi {
+    margin-bottom: 0;
+}
+
+.pollIndicator {
+  position: absolute;
+  left: .75rem;
+  bottom: 1.6rem;
+  display: block;
+  width: .3rem;
+  height: .3rem;
+  background: blue;
+  transition: background 3s ease-out;
+}
+.pollIndicator--busy {
+  background: red;
+  transition: none;
+}
+
+.label-input-pair {
+  display: block;
+  margin-bottom: 2rem;
+  
+  .o-label{
+    color: rgba(white, 0.3);
+    display: block;
+    font-family: $font-stack-sans-SC;
+    font-size: 1.8rem;
+    font-weight: 500;
+    letter-spacing: .1ex;
+    margin-left: .6rem;
+    text-transform: lowercase;
+  }
+  
+  .o-input {
+    background: black;
+    border: .1rem solid rgba(255, 255, 255, 0.5);
+    border-radius: .2rem;
+    color: white;
+    font-family: $font-stack-sans;
+    font-size: 1.8rem;
+    padding: 1.2rem;
+    margin-top: .6rem;
+    transition: border-color .125s ease, color .125s ease;
+    width: 100%;
+    
+    &:placeholder-shown {
+      border-color: rgba(255, 255, 255, 0.3);
+      
+      &::placeholder {
+        color: #363636;
+      }
+    }
+    &::placeholder {
+      color: #363636;
+    }
+    
+    &:focus {
+      border-color: white;
+      color: white;
+      outline: none;
+    }
+    
+    &:hover {
+      border-color: rgba(255, 255, 255, 0.8);
+    }
+    
+    &.o-input--is-error {
+      border-color: rgba(red, .5);
+      
+      &:focus {
+        border-color: red;
+      }
+      &:hover {
+        border-color: rgba(red, .8);
+      }
+    }
+  }
+}
+
+.o-btn {
+  color: white;
+  background-image: linear-gradient(180deg, #16378f 0%, #1d84f7 100%);
+  display: block;
+  width: 100%;
+  border: 1px solid #1347AA;
+  padding: 1rem;
+  border-radius: .2rem;
+  font-size: 1.8rem;
+  font-family: $font-stack-sans-SC;
+  font-weight: 500;
+  text-transform: lowercase;
+  text-decoration: none;
+  text-align: center;
+  transition: background 0.2s 0s;
+  text-shadow: 0 0.25ex 0.2ex #163890;
+  
+  &:hover {
+    background-image: linear-gradient(-180deg, #1C7EEE 0%, #00C1FF 100%);
+  }
+
+  
+  &:active {
+    background-image: linear-gradient(-180deg, #0F6BBF 0%, #00C1FF 100%);
+  }
+}
+
+.toggle-auth-form {
+  display: block;
+  padding: 1.2rem;
+  text-align: center;
+  font-size: 1.6rem;
+  text-decoration: none;
+  font-family: $font-stack-serif;
+  font-style: normal;
+  font-weight: 300;
+  color: rgba(white, 0.4);
+  text-transform: lowercase;
+  margin-top: 1.2rem;
+  transition: color .125s ease;
+  
+  &:hover,
+  &:focus {
+    outline: none;
+    color: white;
+  }
+  
+  &:active {
+    color: rgba(white, .8);
+  }
+}
+
+.heading {
+  display: block;
+  text-align: center;
+  letter-spacing: .3ex;
+  text-transform: lowercase;
+  font: 500 3rem/1 $font-stack-sans-SC;
+}
+
+.view_unauthorised {
+  max-width: 41.2rem;
+  margin: 15rem auto 0;
+}
+
+#particle-surface {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+#pageBody { position: relative; }
+
+.notification-list {
+    list-style: none;
+    float: left;
+    overflow: hidden;
+    max-height: 2rem;
+    position: relative;
+}
+.notification-list--open,
+.notification-list:hover {
+    max-height: 80vh;
+    overflow: auto;
+}
+
+.notification-list li:before {
+    content: '>';
+    font: 600 small monospace;
+    margin-right: 0.35rem;
+    display: inline;
+    color: blue;
+}
+.notification {
+    display: inline-block;
+    height: 1.5rem;
+}
+
+.link {
+    color: blue;
+    text-decoration: none;
+    border-bottom: 6px solid rgba(0,0,255, 0.1);
+}
+
+.link:hover {
+    color: darkblue;
+}
+
+.game-link {
+    padding: 0 0.2rem;
+    position: relative;
+}
+.game-link:hover {
+    transform:scale(1.1);
+}
+
+/*                                         *
+ *               GAME STYLES               *
+ *                                         */
+
+  .nest[data-player="0"] .piece_poly--inner, 
+  .piece[data-player="0"] .piece_poly--inner { fill: white; }
+  .nest[data-player="1"] .piece_poly--inner, 
+  .piece[data-player="1"] .piece_poly--inner { fill: black; }
+  .nest--activePlayer {
+    stroke: pink;
+  }
+  .nest--p1 .nest-player {
+    fill: white;
+    stroke: black;
+    stroke-width: 2px;
+  }
+  .nest--p2 .nest-player {
+    fill: black;
+  }
+
+  .nest-background { fill: transparent; stroke: transparent; }
+  .nest--activePlayer .nest-background { fill: transparent; stroke: red; }
+
+  .piece[data-type=MOTHERSHIP] .piece_poly--outer { fill: gold; }
+  .piece[data-type=HOPPER]     .piece_poly--outer { fill: limegreen; }
+  .piece[data-type=SPIDER]     .piece_poly--outer { fill: peru; }
+  .piece[data-type=SCOUT]      .piece_poly--outer { fill: royalblue; }
+  .piece[data-type=CRAWLER]    .piece_poly--outer { fill: purple; }
+  .piece[data-type=SHIFTER]    .piece_poly--outer { fill: grey; }
+
+  /* these need to be renamed */
+  .piece[data-type=pillbug]     .piece_poly--outer { fill: lightgray; }
+  .piece[data-type=ladybug]     .piece_poly--outer { fill: red; }
+
+  .moveSlot .piece_poly--outer,
+  .putSlot .piece_poly--outer {
+    fill: none;
+    stroke: gray;
+  }
+  .moveSlot text,
+  .putSlot text {
+    fill: gray;
+    text-anchor: middle;
+    dominant-baseline: central;
+  }
+  .moveSlot text:hover,
+  .putSlot text:hover {
+    fill: blue;
+    cursor: pointer;
+    transform: scale(1.2);
+  }

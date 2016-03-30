@@ -1,4 +1,3 @@
-function addV2(p1, p2) { return [ p1[0] + p2[0], p1[1] + p2[1] ]; }
 
 
 ///
@@ -579,9 +578,10 @@ var GameBoard = React.createClass({
         }
       }
     }
+    var padding = pieceR/2;
     pieces.unshift(
-      <rect className="nest-background" width={i * (pieceR + 1)}
-        transform={format("translate(-$1,-$1)", pieceR/2)} />);
+      <rect className="nest-background" width={i*(pieceR + 1) + 2*padding} height={pieceR + 2*padding}
+        transform={format("translate(-$1,-$1)", pieceR/2 + padding)} />);
     return pieces;
   },
   render: function() {
@@ -628,9 +628,11 @@ var GameBoard = React.createClass({
           })}
         </g>
         <g className={p1NestClasses} transform="translate(-100, -220)">
+          <text className={"nest-player"} transform="translate(-100, 0)"><tspan >{props.playersInOrder[0].username}</tspan></text>
           {this.renderNest(props.playersInOrder[0].nest, 0)}
         </g>
         <g className={p2NestClasses} transform="translate(-100, 220)">
+          <text className={"nest-player"} transform="translate(-100, 0)"><tspan>{props.playersInOrder[1].username}</tspan></text>
           {this.renderNest(props.playersInOrder[1].nest, 1)}
         </g>
       </svg>);

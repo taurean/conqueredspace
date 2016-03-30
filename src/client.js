@@ -405,10 +405,16 @@ function refreshSession(store) {
 function restoreSession(store) {
   var token = window.localStorage.getItem('sessionToken');
   var ok = Boolean(token);
+  var session;
+  if (ok) {
+    session = sessionFromToken(token);
+    ok = isSessionValid(session)
+  }
+  
   if (ok) {
     store.dispatch({
       type: ACTIONS.LOG_IN_SUCCESFUL,
-      session: sessionFromToken(token)
+      session: session
     })
   }
   return ok;
@@ -510,7 +516,7 @@ var RouteLink = React.createClass({
     return false;
   },
   render: function() {
-    return <a href={this.props.path} onClick={this.handleClick}>{this.props.children}</a>
+    return <a className={"link " + this.props.className} href={this.props.path} onClick={this.handleClick}>{this.props.children}</a>
   }
 });
 
@@ -522,6 +528,7 @@ function initRouteSystem(store, routes, specialRoutes) {
   store.subscribe(function(state, dispatch, action) {
     if(action.type === ACTIONS.ROUTE && state.routePath != currentPath) {
       history.pushState({}, "", state.routePath);
+      currentPath = state.routePath;
     }
   });
 
@@ -591,8 +598,9 @@ var DashboardView = React.createClass({
  
     return (
       <div>
+        <h3>Active games</h3>
         <GameListing games={games} />
-        <h2>Request new game</h2>
+        <h3>Request new game</h3>
         <GameRequestForm onSubmit={this.requestGame} />
       </div>);
   }
@@ -686,7 +694,7 @@ var TopMenu = React.createClass({
     ];
 
     return (<ul className="topMenu">
-        {options.map(i => <li className={"menu-item" + (i.path==path) ? " menu-item--active" : ""}>
+        {options.map(i => <li className={"menu-item" + (i.path==path ? " menu-item--active" : "")}>
             <RouteLink path={i.path}>{i.label}</RouteLink>
           </li>)}
       </ul>);
@@ -742,40 +750,50 @@ var UserCreationForm = React.createClass({
     return false;
   },
   render: function() {
+    var idPrefix = '';
+    if (this.props.id) {
+      idPrefix = this.props.id + '-';
+    }
     var errs = this.state.errors;
     if (! 'form' in errs) errs['form'] = null;
     if (! 'email' in errs) errs['email'] = null;
     if (! 'username' in errs) errs['username'] = null;
     if (! 'password' in errs) errs['password'] = null;
 
-    return <form>
+    return <form className="newUserForm">
       {<ErrorList field="form" errors={errs['form']} />}
-      <ul className="form-fields">
-      <li className="form-field">
-        <label>
-          Username:
-          <input name="username" onChange={this.saveInputChange} required="required"/>
-        </label>
+      <label className="label-input-pair" htmlFor={idPrefix + 'usernam-field'}>
+        <span className="o-label">Username</span>
+        <input id={idPrefix + 'username-field'} 
+          className="o-input"
+          name="username" 
+          onChange={this.saveInputChange}
+          placeholder="keen_commando33"
+          required="required"/>
         {<ErrorList field="form" errors={errs['username']} />}
-      </li>
-      <li className="form-field">
-        <label>
-          Password:
-          <input name="password" onChange={this.saveInputChange} type="password" required="required"/>
-        </label>
+      </label>
+      <label className="label-input-pair" htmlFor={idPrefix + 'password-field'}>
+        <span className="o-label">Password</span>
+        <input id={idPrefix + 'password-field'} 
+          className="o-input"
+          name="password" onChange={this.saveInputChange} 
+          type="password" 
+          placeholder="s3cret"
+          required="required"/>
         {<ErrorList field="form" errors={errs['password']} />}
-      </li>
-      <li className="form-field">
-        <label>
-          Email
-          <input name="email" onChange={this.saveInputChange} type="email" required="required"/>
-        </label>
+      </label>
+      <label className="label-input-pair" htmlFor={idPrefix + 'email-field'}>
+        <span className="o-label">Email</span>
+        <input id={idPrefix + 'email-field'}  
+          className="o-input"
+          name="email" 
+          onChange={this.saveInputChange} 
+          type="email"
+          placeholder="keen33@space-federation.com"
+          required="required"/>
         {<ErrorList field="form" errors={errs['email']} />}
-      </li>
-      <li className="form-field">
-        <button onClick={this.handleSubmit}>Sign Up</button>
-      </li>
-      </ul>
+      </label>
+      <input type="submit" className="o-btn" value="Sign Up" />
     </form>
   }
 });
@@ -791,31 +809,72 @@ var LoginForm = React.createClass({
     return false;
   },
   render: function () {
+    var idPrefix = '';
+    if (this.props.id) {
+      idPrefix = this.props.id + '-';
+    }
     var error = null;
     var formClass = "loginForm";
     if (this.props.error) {
-      error = <p className="error error--login">{this.props.error.message}</p>
-      formClass += " form--errors";
+      error = <p className="error-message error--login">{this.props.error.message}</p>
+      formClass += " form--is-error";
     }
     return (
-    <form className="loginForm" onSubmit={this.onSubmit}>
-      <label>
-        Username:
+    <form className="log-in" onSubmit={this.onSubmit}>
+      {error}
+      <label className="label-input-pair" htmlFor={idPrefix + 'username-field'}>
+        <span className="o-label">Username</span>
         <input onChange={this.onChangeUsername}
+          id={idPrefix + 'username-field'}
+          className="o-input"
           value={this.state.username}
-          placeholder="..."
+          placeholder="keen_commando33"
           required="required"/>
       </label>
-      <label>
-        Password:
+      <label className="label-input-pair" htmlFor={idPrefix + 'password-field'}>
+        <span className="o-label">Password</span>
         <input onChange={this.onChangePassword}
+          id={idPrefix + 'password-field'}
+          className="o-input"
           type="password"
           value={this.state.password}
+          placeholder="••••••••"
           required="required"/>
       </label>
-      <button onClick={this.onSubmit}>log in</button>
-      {error}
+      <input type="submit" value="Log In" className="o-btn" />
     </form>);
+  }
+});
+
+var AuthorizationView = React.createClass({
+  getInitialState: function() {
+    return { 
+      showLogin: true
+    };
+  },
+  login: function(username, password, keep) { logIn(globalStore, username, password, keep) },
+  logout: function() { logOut(globalStore); },
+  createUser: function() {},
+  onSubmit: function() {},
+
+  toggleShowLogin: function() { this.setState({ showLogin: ! this.state.showLogin}); },
+
+  render: function() {
+    var toggleFormLabel, submitLabel, formItems;
+    if (this.state.showLogin) {
+      formItems = (<LoginForm onSubmit={this.login} error={globalStore.getState().session.error}/>);
+      submitLabel = "Log In";
+      toggleFormLabel = "create an account instead";
+    } else {
+      formItems = (<UserCreationForm />);
+      submitLabel = "Sign Up";
+      toggleFormLabel = "log in instead";
+    } 
+    return <section className="view_unauthorised content">
+        <h1 className="heading">Conquered Space</h1>
+        { formItems }
+        <a className="toggle-auth-form" onClick={this.toggleShowLogin}>{toggleFormLabel}</a>
+      </section>
   }
 });
 
@@ -962,13 +1021,14 @@ var Notification = React.createClass({
       case 'OPPONENT_PLAYED_PIECE':
       case 'OPPONENT_RESIGNED': {
         var gamePath = 'games/' + props.parameters[0];
-        props.parameters[1] = idToUsername(state, props.parameters[1]);
+
         var formatArguments = [messageFormat].concat(props.parameters);
+        formatArguments[2] = idToUsername(state, props.parameters[1]);
         message = format.apply(null, formatArguments);
 
         content = (<div className={classes}>
-            {message} <RouteLink path={gamePath}>Go to game</RouteLink>
-            <button onClick={this.markNotificationRead}>done</button>
+            {message} <RouteLink className="game-link" path={gamePath}>Go to game</RouteLink>
+            <button onClick={this.markNotificationRead}>mark read</button>
           </div>);
       } break;
 
@@ -1085,11 +1145,8 @@ var PollIndicator = React.createClass({
 });
 
 var Page = React.createClass({
-  login: function(username, password, keep) { logIn(this.props.store, username, password, keep) },
-  logout: function() { logOut(this.props.store); },
-
   renderNotificationList: function(notifications) {
-    return (<ol>
+    return (<ol className="notification-list">
         {mapOver(notifications, function(n) {
           if (!n.read) {
             return (<li key={n.id}><Notification {...n} /></li>);
@@ -1105,11 +1162,14 @@ var Page = React.createClass({
 
     return (<div>
         <div className="topbar">
+          <p className="hi">
+            Hi {state.session.username || (<span className="intruder">UNKNOWN INTRUDER</span>)}
+            <button className="button logout-button" onClick={this.logout}>Log Out</button>
+          </p>
+            
+          <PollIndicator store={this.props.store} />
           <TopMenu />
           {this.renderNotificationList(notifications)}
-          <button onClick={this.logout}>Log Out</button>
-          <PollIndicator store={this.props.store} />
-          <UserSummary username={state.session.username} />
         </div>
 
         <div style={{border: "1px solid black"}}>
@@ -1118,17 +1178,7 @@ var Page = React.createClass({
       </div>);
   },
   renderUnauthenticated: function() {
-    return <div>
-        <p>Welcome to the pre-pre-alpha test version of <em>Conquered Space</em>. Thank you for trying us out and helping find problems. Let us know if you find any.</p>
-        <div className="login">
-          <h3>Log in</h3>
-          <LoginForm onSubmit={this.login} error={this.props.store.getState().session.error}/>
-        </div>
-        <div className="createUser">
-          <h3>Create user</h3>
-          <UserCreationForm />
-        </div>
-      </div>
+    return <AuthorizationView />
   },
 
   render: function() {
@@ -1146,6 +1196,7 @@ function renderPage() {
 
 var globalStore = createStore(rootReduxer);
 function onPageLoad() {
+  initParticles();
   initPollSystem(globalStore);
   initRouteSystem(globalStore);
   restoreSession(globalStore);
