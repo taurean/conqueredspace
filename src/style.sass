@@ -143,6 +143,7 @@ ul, ol, li {
   border: 1px solid #1347AA;
   padding: 1rem;
   border-radius: .2rem;
+  cursor: pointer;
   font-size: 1.8rem;
   font-family: $font-stack-sans-SC;
   font-weight: 500;
@@ -195,9 +196,18 @@ ul, ol, li {
   font: 500 3rem/1 $font-stack-sans-SC;
 }
 
-.view_unauthorised {
+.content {
+  position: relative;
   max-width: 41.2rem;
   margin: 15rem auto 0;
+}
+
+.o-error {
+  color: red;
+}
+
+p {
+  font: 400 1.4rem/1.4 $font-stack-serif;
 }
 
 #particle-surface {

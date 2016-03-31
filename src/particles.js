@@ -62,7 +62,6 @@ function initParticles() {
     for(var i = 0; i < vertSectorCount; ++i) {
       fillSector(resetCol[i], starCount, [ horSectorCenters[colIndex], vertSectorCenters[i] ]);
     }
-    console.log('shiftl' + ++shiftCount);
   }
   function shiftRight() {
     var colIndex = mod(topLeftSector[0]/sectorWidth, horSectorCount);
@@ -72,7 +71,6 @@ function initParticles() {
     for(var i = 0; i < vertSectorCount; ++i) {
       fillSector(resetCol[i], starCount, [ horSectorCenters[colIndex], vertSectorCenters[i] ]);
     }
-    console.log('shiftr' + ++shiftCount);
   }
   function shiftUp() {
     var rowIndex = mod(vertSectorCount - 1 + topLeftSector[1]/sectorHeight, vertSectorCount);
@@ -184,7 +182,105 @@ function initParticles() {
         }
       }
     }
+
+    hexagons(t, dt);
   });
+
+
+  var hexagons = (function() {
+    var renderTarget = document.getElementById("logo-background");
+    if (!renderTarget) return function() {}
+    var ctx = renderTarget.getContext("2d");
+    var w = renderTarget.width;
+    var h = renderTarget.height;
+    var loadingT = false;
+    var loadingPercent = 0;
+
+    var r;
+    var n = 6;
+    var outerPoints;
+    function setDimsAndOutline() {
+      ctx.translate(w/2, h/2);
+      r = Math.min(w, h)/2*0.8;
+      outerPoints = Array(n);
+      for (var i = 0; i < n; ++i) outerPoints[i] = [r*Math.cos(i*TAU/n), r*Math.sin(i*TAU/n)];
+    }
+    setDimsAndOutline();
+
+    function lerpRgba(rgba1, rgba2, t) {
+        var colorComponents = Array(4);
+        colorComponents[0] = Math.round(lerp(rgba1[0], rgba2[0], t));
+        colorComponents[1] = Math.round(lerp(rgba1[1], rgba2[1], t));
+        colorComponents[2] = Math.round(lerp(rgba1[2], rgba2[2], t));
+        colorComponents[3] = lerp(rgba1[3], rgba2[3], t);
+        return 'rgba(' + colorComponents.join(',') + ')';
+    }
+
+    function index(i) { return (i + n) % n; }
+
+    var outerColor = [33, 168, 214, 1];
+    var innerColor = [202, 65, 56, 1];
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "red";
+    function hexagons(t, dt) {
+      var i, j;
+      if (loadingPercent < 1) {
+        loadingPercent += dt/500;
+
+        ctx.clearRect(-w/2, -h/2, w, h);
+        ctx.moveTo(outerPoints[0][0], outerPoints[0][1]);
+        for (j = 0; j < n; j++) {
+          ctx.beginPath();
+          var a = outerPoints[index(j - 1)];
+          var b = outerPoints[index(j)];
+          var ab = negV2(b, a);
+
+          ab = addV2(a, sclV2(ab, sqr(loadingPercent)));
+
+          ctx.moveTo(a[0], a[1]);
+          ctx.lineTo(ab[0], ab[1]);
+          ctx.stroke();
+        }
+        // ctx.closePath();
+      } else {
+        if (!loadingT) {
+          loadingT = t;
+          document.body.className = "";
+          return;
+        }
+
+        var stageCount = 6;
+        var bezierStages = Array(stageCount);
+        var d = (t - loadingT) / 1500; 
+        d = Math.min(d*d, 0.1)
+        bezierStages[0] = outerPoints;
+        for (i = 1; i < stageCount; ++i) {
+            var stage = Array(n);
+            for (var j = 0; j < n; ++j) {
+                var a = bezierStages[i - 1][index(j - 1)];
+                var b = bezierStages[i - 1][index(j)];
+                var ab = negV2(b, a);
+
+                stage[j] = addV2(a, sclV2(ab, d));
+            }
+            bezierStages[i] = stage;
+        }
+
+        ctx.clearRect(-w/2, -h/2, w, h);
+        for (i = 0; i < stageCount; ++i) {
+            ctx.beginPath();
+            ctx.moveTo(bezierStages[i][0][0], bezierStages[i][0][1]);
+            for (j = 1; j < n; j++) {
+                ctx.lineTo(bezierStages[i][index(j)][0], bezierStages[i][index(j)][1]);
+            }
+            ctx.closePath();
+            ctx.stroke();
+        }
+      }
+    }
+
+    return hexagons;
+  })();
 }
 
 var starRadius = 3;
@@ -206,3 +302,4 @@ function pseudoRandomGenerator(x, y, z) {
     return (x/30269.0 + y/30307.0 + z/30323.0) % 1.0;
   }
 }
+

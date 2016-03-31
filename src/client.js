@@ -376,6 +376,10 @@ function _logIn(store, token) {
   });
 }
 function logIn(store, username, password, keep) {
+  if (store.getState().session.loading) {
+    console.warn('Trying to log in, but previous request is not done');
+    return;
+  }
   store.dispatch(function(dispatcher) {
     dispatcher({ type: ACTIONS.LOGGING_IN });
 
@@ -760,7 +764,7 @@ var UserCreationForm = React.createClass({
     if (! 'username' in errs) errs['username'] = null;
     if (! 'password' in errs) errs['password'] = null;
 
-    return <form className="newUserForm">
+    return <form className="newUserForm" onSubmit="handleSubmit">
       {<ErrorList field="form" errors={errs['form']} />}
       <label className="label-input-pair" htmlFor={idPrefix + 'usernam-field'}>
         <span className="o-label">Username</span>
@@ -816,7 +820,11 @@ var LoginForm = React.createClass({
     var error = null;
     var formClass = "loginForm";
     if (this.props.error) {
-      error = <p className="error-message error--login">{this.props.error.message}</p>
+      var errorMessage = this.props.error.message;
+      if (this.props.error.code == 0) {
+        errorMessage = "Ruh roh. Could not reach server";
+      }
+      error = <p className="o-error error--login">{errorMessage}</p>
       formClass += " form--is-error";
     }
     return (
