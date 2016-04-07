@@ -1,7 +1,6 @@
 /*
 ///TODO:
 
-- Routing
 - Implement all notifications
     - Game started
     - Opponent accepted game
@@ -11,92 +10,6 @@
 */
 
 
-function assert(a, s) { if (!a) { alert("assert fired! " + s); debugger; } }
-function invalidCodePath() { alert("invalid code path reached"); debugger; }
-function peek(arr) { return arr[arr.length - 1]; }
-
-// A small implementation of the redux library.
-// I haven't bought into the concept fully yet, but this way I can try it.
-// It also has some functionality to work with async workflows built in, which would otherwhise need middle ware (read; more bloat)
-function createStore(reduxer) {
-  var subscribers = [];
-  var state;
-  function unsubscribe(fn) {
-    subscribers = subscribers.filter(function(f) { return f !== fn });
-  }
-  var store = {
-    getState: function() { return state },
-    dispatch: function(action) {
-      if (typeof action == "function") {
-        action(store.dispatch);
-      } else {
-        state = reduxer(state, action);
-      }
-      subscribers.forEach(function(subscriber) { subscriber(state, store.dispatch, action); });
-    },
-    subscribe: function(fn) {
-      subscribers.push(fn);
-      return unsubscribe.bind(fn);
-    }
-  };
-
-  store.dispatch({});
-  return store;
-}
-
-
-function getNow() { return Date.now()/1000; }
-
-// Take a string "hello $1, how is $2", and replace #0 and $1 with supplied arguments
-function format(f) {
-  for(var i = 1; i < arguments.length; ++i)
-    f = f.replace(new RegExp('\\$' + i, 'g'), arguments[i]);
-  return f;
-}
-
-
-function encodeMap(data) {
-  var encodedData = "";
-  for (var dataKey in data) {
-    var encodedKey = encodeURIComponent(dataKey);
-    var d = data[dataKey];
-    /// TODO: more robust array detection?
-    if (d && d.length && typeof d != 'string') {
-      for (var i = 0; i < d.length; ++i) {
-        encodedData += encodedKey + "=" + encodeURIComponent(d[i]) + "&";
-      }
-    } else {
-      encodedData += encodedKey + "=" + encodeURIComponent(d) + "&";
-    }
-  }
-  return encodedData;
-}
-
-function openXhr(method, url, cb, headers) {
-  var x = new XMLHttpRequest();
-  x.open(method, url);
-  for (var header in headers) x.setRequestHeader(header, headers[header]);
-  x.onreadystatechange = function() { if (x.readyState === x.DONE) cb(x.status, x.response); };
-  return x;
-}
-function GET(url, data, cb, headers) {
-  headers = headers || {};
-  headers["Content-type"] = "application/x-www-form-urlencoded";
-  openXhr('GET', url + '?' + encodeMap(data), cb, headers).send();
-}
-function PUT(url, data, cb, headers) {
-  headers = headers || {};
-  headers["Content-type"] = "application/x-www-form-urlencoded";
-  openXhr('PUT', url + '?' + encodeMap(data), cb, headers).send();
-}
-function POST(url, data, cb, headers) {
-  headers = headers || {};
-  headers["Content-type"] = "application/x-www-form-urlencoded";
-  openXhr('POST', url, cb, headers).send(encodeMap(data));
-}
-
-function statusOK(status) { return status && 200 <= status && status < 300; }
-
 function authHeader(state) {
   return { Authorization: 'BEARER ' + state.session.tokenString};
 }
@@ -104,33 +17,6 @@ function authPayload(state) {
   return { access_token: state.session.tokenString };
 }
 
-var urls = {
-  users: BASE_URL + 'users',
-  userGames: (uid => [urls.users, uid, 'games'].join('/')),
-
-  games: BASE_URL + 'games',
-  gameMoves: (gid => [urls.games, gid, 'moves'].join('/')),
-  gamePlayer: ((uid, gid) => [urls.games, gid, 'players', uid].join('/')),
-  sessions: BASE_URL + 'sessions',
-  notifications: BASE_URL + 'notifications',
-  notificationRead: (nid => [urls.notifications, nid, 'read'].join('/')),
-};
-
-function mapOver(src, mapping) {
-  var target = [];
-  for (var key in src) {
-    target.push(mapping(src[key], key));
-  }
-  return target;
-}
-
-function assign(/*...objects*/){
-  var r = arguments[0];
-  for (var i = 1; i < arguments.length; ++i) {
-    for (var key in arguments[i]) r[key] = arguments[i][key];
-  }
-  return r;
-}
 
 /// trie impl
 function trieInsert(node, k, v, d) {
@@ -178,9 +64,52 @@ function trieWalkKeys(node, prefix) {
 }
 
 
+var urls = {
+  users: BASE_URL + 'users',
+  userGames: (uid => [urls.users, uid, 'games'].join('/')),
+
+  games: BASE_URL + 'games',
+  gameMoves: (gid => [urls.games, gid, 'moves'].join('/')),
+  gamePlayer: ((uid, gid) => [urls.games, gid, 'players', uid].join('/')),
+  sessions: BASE_URL + 'sessions',
+  notifications: BASE_URL + 'notifications',
+  notificationRead: (nid => [urls.notifications, nid, 'read'].join('/')),
+};
+
+
 ///
 /// State management
 ///
+
+// A small implementation of the redux library.
+// I haven't bought into the concept fully yet, but this way I can try it.
+// It also has some functionality to work with async workflows built in, which would otherwhise need middle ware (read; more bloat)
+function createStore(reduxer) {
+  var subscribers = [];
+  var state;
+  function unsubscribe(fn) {
+    subscribers = subscribers.filter(function(f) { return f !== fn });
+  }
+  var store = {
+    getState: function() { return state },
+    dispatch: function(action) {
+      if (typeof action == "function") {
+        action(store.dispatch);
+      } else {
+        state = reduxer(state, action);
+      }
+      subscribers.forEach(function(subscriber) { subscriber(state, store.dispatch, action); });
+    },
+    subscribe: function(fn) {
+      subscribers.push(fn);
+      return unsubscribe.bind(fn);
+    }
+  };
+
+  store.dispatch({});
+  return store;
+}
+
 
 var ACTIONS = {
   REPLY_GAME_REQUEST: "REPLY_GAME_REQUEST",
@@ -204,7 +133,11 @@ var ACTIONS = {
 };
 
 var initialState = {
-  routePath: "",
+  route: {
+    path: '/',
+    name: '/',
+    params: []
+  },
   pollStatus: {
     running: false,
     lastPoll: null,
@@ -237,7 +170,11 @@ function rootReduxer(state, action) {
   switch(action.type) {
   case ACTIONS.ROUTE:
     var newState = assign({}, state);
-    newState.routePath = action.path;
+    newState.route = {
+      path: action.path,
+      name: action.name,
+      params: action.params
+    };
     return newState;
 
   case ACTIONS.RUN_POLLING:
@@ -266,10 +203,10 @@ function rootReduxer(state, action) {
     }
     for (k in action.games) {
       o = action.games[k]
-      for (var kk in o.players) {
-        var p = o.players[kk];
+      for (var kk in o.playersInOrder) {
+        var p = o.playersInOrder[kk];
         trieInsert(newState.userLookup, p.username, p.id);
-        o.players[kk] = p.id;
+        o.playersInOrder[kk] = p.id;
         newState.users[p.id] = p;
       }
       newState.games[o.id] = o;
@@ -294,8 +231,7 @@ function rootReduxer(state, action) {
     return newState;
 
   case ACTIONS.LOG_OUT:
-    var newState = assign({}, state);
-    newState.session = assign({}, initialState.session);
+    var newState = assign({}, initialState);
     return newState;
   case ACTIONS.LOGGING_IN:
     var newState = assign({}, state);
@@ -339,7 +275,7 @@ function rootReduxer(state, action) {
     var newState = assign({}, state);
     newState.notifications[action.id].read = true;
     return state;
-  
+
   case ACTIONS.INVALIDATE_GAME_VIEW:
     var newState = assign({}, state);
     newState.errors.push(action.error);
@@ -359,7 +295,7 @@ function rootReduxer(state, action) {
 ///
 
 /// NOTE(): checking the user id should not be neccesary, but I don't think it is harmful..
-function isSessionValid(session) { return session.userId !== null && getNow() < session.expiration; }
+function isSessionValid(session) { return session && session.userId !== null && getNow() < session.expiration; }
 function sessionFromToken(token) {
   var tokenParts = /([^.]+).([^.]+).([^.]+)/.exec(token);
   return {
@@ -369,11 +305,12 @@ function sessionFromToken(token) {
   };
 }
 function _logIn(store, token) {
-  window.localStorage.setItem('sessionToken', token);
+  var session = sessionFromToken(token);
   store.dispatch({
     type: ACTIONS.LOG_IN_SUCCESFUL,
-    session: sessionFromToken(token)
+    session: session
   });
+  window.localStorage.setItem('sessionToken', JSON.stringify(session));
 }
 function logIn(store, username, password, keep) {
   if (store.getState().session.loading) {
@@ -407,20 +344,19 @@ function refreshSession(store) {
   });
 }
 function restoreSession(store) {
-  var token = window.localStorage.getItem('sessionToken');
-  var ok = Boolean(token);
   var session;
-  if (ok) {
-    session = sessionFromToken(token);
-    ok = isSessionValid(session)
-  }
-  
+  try {
+    var token = window.localStorage.getItem('sessionToken');
+    if (token) { session = JSON.parse(token); }
+  } catch(e) { console.err(e) }
+  var ok = session && getNow() < session.data.exp;
   if (ok) {
     store.dispatch({
       type: ACTIONS.LOG_IN_SUCCESFUL,
       session: session
-    })
+    });
   }
+
   return ok;
 }
 
@@ -448,13 +384,21 @@ function poll() {
     { filter: 'dashboard' },
     function(status, data) {
       if (statusOK(status)) {
-        var dashboardData = JSON.parse(data);
-        globalStore.dispatch(assign(dashboardData, { type: ACTIONS.POLL_SUCCESS }));
+        try {
+          var dashboardData = JSON.parse(data);
+          globalStore.dispatch(assign(dashboardData, { type: ACTIONS.POLL_SUCCESS }));
+        } catch(e) {
+          console.warn("could not parse dashboard data: ", e, data);
+        }
       } else {
         globalStore.dispatch({
           type: ACTIONS.POLL_FAILED,
           errors: data
         });
+        if (status == 404 || status == 401) {
+          console.log("The current session seems not to be accepted by the server anymore. We let the user relog");
+          logOut(globalStore)
+        }
       }
     },
     authHeader(state)
@@ -509,35 +453,6 @@ function requestGame(store, invitee) {
 /// Routing
 ///
 
-var RouteLink = React.createClass({
-  handleClick: function(e) {
-    /// TODO: only do this with primary mouse button..
-    e.preventDefault();
-    globalStore.dispatch({
-      type: ACTIONS.ROUTE,
-      path: this.props.path
-    });
-    return false;
-  },
-  render: function() {
-    return <a className={"link " + this.props.className} href={this.props.path} onClick={this.handleClick}>{this.props.children}</a>
-  }
-});
-
-function initRouteSystem(store, routes, specialRoutes) {
-  //var router = buildRoutes(routes);
-  var currentPath = store.getState().routePath;
-  var newPath = location.href.substr(document.baseURI.length);
-  store.dispatch({ type: ACTIONS.ROUTE, path: newPath });
-  store.subscribe(function(state, dispatch, action) {
-    if(action.type === ACTIONS.ROUTE && state.routePath != currentPath) {
-      history.pushState({}, "", state.routePath);
-      currentPath = state.routePath;
-    }
-  });
-
-}
-
 var gameStore = createStore(gameReduxer);
 
 var GameView = React.createClass({
@@ -551,16 +466,18 @@ var GameView = React.createClass({
       var gameData = appState.games[id];
       var viewState = viewStore.getState();
       if (viewState.id != id || viewState.lastMoveCreated < peek(gameData.moves).created) {
-        var playersById = {};
-        for (var i = 0; i < gameData.players.length; ++i) {
-          var pid = gameData.players[i];
-          playersById[pid] = assign({}, appState.users[pid]);
+        var playerCount = gameData.playersInOrder.length;
+        var playersInOrder = Array(playerCount);
+        for (var i = 0; i < playerCount; ++i) {
+          var pid = gameData.playersInOrder[i];
+          playersInOrder[i] = assign({}, appState.users[pid])
         }
         viewStore.dispatch({
           type: GAME_ACTIONS.LOAD,
           id: id,
           moves: gameData.moves,
-          playersById: playersById
+          startShipCount: gameData.startShipCount,
+          playersInOrder: playersInOrder
         });
         // } else if (gameView.lastMoveCreated < peek(data.moves).created) {
         //   var newMoves = [];
@@ -595,113 +512,212 @@ var GameView = React.createClass({
 
 var DashboardView = React.createClass({
   requestGame: function(invitee) { requestGame(globalStore, invitee); },
- 
+
   render: function() {
     var state = globalStore.getState();
-    var games = mapOver(state.session.gameIds, function(id) { return state.games[id]; });
- 
+    var games;
+    var gameIds = state.session.gameIds;
+    if (gameIds && gameIds.length) {
+      games = Array()
+      for (var i = 0; i < gameIds.length; ++i) {
+        var g = state.games[gameIds[i]];
+        if (g.started) { games.push(g); }
+      }
+    }
+
+    var activeGames;
+    if (games && games.length) {
+      activeGames = (<section className="active-games">
+          <h3>Active games</h3>
+          <GameListing games={games} />
+        </section>);
+    } else {
+      activeGames = null;
+    }
+
     return (
       <div>
-        <h3>Active games</h3>
-        <GameListing games={games} />
-        <h3>Request new game</h3>
-        <GameRequestForm onSubmit={this.requestGame} />
+        <div className="l-g2">
+          <section className="new-game">
+            <h3>Start a new game</h3>
+            <GameRequestForm onSubmit={this.requestGame} />
+          </section>
+          <section className="incoming-game-requests">
+            <h3>Incoming game requests</h3>
+            <ol className="notification-list">
+              {mapOver(state.notifications, function(n) {
+                if (!n.read) {
+                  return (<li key={n.id}><Notification {...n} /></li>);
+                }
+              })}
+            </ol>
+          </section>
+        </div>
+
+        {activeGames}
       </div>);
   }
 });
 
-var Router = React.createClass({
+var TopBar = React.createClass({
+  logout: function() {
+    logOut(this.props.store);
+  },
+  render: function() {
+    var state = this.props.store.getState();
 
-  componentWillMount: function() { this.buildRoutes(); },
+    return (<div className="c-topbar">
+      <div className="primary">
+        <span className="o-page-name">{this.props.pageName}</span>
+        <h1 className="heading">
+          <canvas ref={updateLogoRenderTarget} className="logo-surface" width="100" height="100"></canvas>
+          <span className="heading-text">Conquered Space</span>
+        </h1>
+        <p className="hi">
+          Hi {state.session.username || (<span pplassName="intruder">UNKNOWN INTRUDER</span>)}<br/>
+          <a className="logout" onClick={this.logout}>Log Out</a>
+        </p>
+      </div>
+      
+      <div className="secondary">
+        <PollIndicator store={this.props.store} />
+        
+        <nav className="top-nav">
+          <a className="o-menu-item">Notifications</a>
+          <a className="o-menu-item">Rules</a>
+        </nav>
+      </div>
+    </div>);
+  }
+})
+
+
+function changeRoute(store, routingTrie, route) {
+  var matchedRoute = routingTrie.value;
+  var matchedParams = [];
+  var foundMatch = false;
+  if (route && route.length) {
+    var i;
+    var segments = route.split('/');
+    var activeNodes = [ { node: routingTable.rootNode, params: [] } ];
+    for (i = 0; i < segments.length && activeNodes.length; ++i) {
+      var s = segments[i];
+      var nodeCount = activeNodes.length;
+      var newNodes = [];
+      for (var ii = 0; ii < nodeCount; ++ii) {
+        var n = activeNodes[ii];
+        if (s in n.node.children) {
+          newNodes.push({
+            node: n.node.children[s],
+            params: n.params
+          });
+        }
+        if ('*' in n.node.children) {
+          newNodes.push({
+            node: n.node.children['*'],
+            params: n.params.concat(s)
+          });
+        }
+      }
+      activeNodes = newNodes;
+    }
+
+    var leafNode = null;
+    for (i = 0; i < activeNodes.length && !leafNode; ++i) {
+      if (activeNodes[i].node.value) leafNode = activeNodes[i];
+    }
+
+    if (leafNode) {
+      console.log("matched routes and found: ", leafNode);
+      matchedRoute = leafNode.value;
+      matchedParams = leafNode.params;
+      foundMatch = true;
+    } else {
+      console.warn("Could not find matching route for ", route, activeNodes);
+    }
+  }
+
+  if (!foundMatch) route = '';
+
+
+  store.dispatch({
+    type: ACTIONS.ROUTE,
+    name: matchedRoute,
+    params: matchedParams,
+    path: route
+  });
+}
+
+var globalRouteTrie;
+function initRouteSystem(store, routes, specialRoutes) {
+  //var router = buildRoutes(routes);
+
+  var routes = [ '', 'games/*' ];
+
+  globalRouteTrie = { children: { } };
+  for (var k in routes) {
+    var segments = routes[k].split('/');
+    var currentNode = globalRouteTrie;
+    for (var i = 0; i < segments.length; ++i) {
+      var s = segments[i];
+      if (s == '') { continue; }
+      if (! (s in currentNode.children)) {
+        currentNode.children[s] = { children: { } };
+      }
+      currentNode = currentNode.children[s];
+    }
+    currentNode.value = routes[k];
+  }
+
+  var currentPath = store.getState().routePath;
+  var newPath = location.href.substr(document.baseURI.length);
+  changeRoute(store, globalRouteTrie, newPath);
+  store.subscribe(function(state, dispatch, action) {
+    if(action.type === ACTIONS.ROUTE && state.routePath != currentPath) {
+      history.pushState({}, "", state.routePath);
+      currentPath = state.routePath;
+    }
+  });
+}
+
+var Router = React.createClass({
   routeTrie: null,
   routes: {
     "games/*": function(params) {
-      return <GameView id={parseInt(params[0])} store={gameStore} />
+      return (<div className="content content--wide">
+          <TopBar pageName="Game" store={globalStore} />
+          <GameView id={parseInt(params[0])} store={gameStore} />
+        </div>);
     },
-  },
-  specialRoutes: {
-    default: function() { return <DashboardView /> }
-  },
-  buildRoutes: function() {
-    this.routeTrie = { children: { } };
-    for (var k in this.routes) {
-      var segments = k.split('/');
-      var currentNode = this.routeTrie;
-      for (var i = 0; i < segments.length; ++i) {
-        var s = segments[i];
-        if (! (s in currentNode.children)) {
-          currentNode.children[s] = { children: { } };
-        }
-        currentNode = currentNode.children[s];
-      }
-      currentNode.handler = this.routes[k];
+    "": function(params) {
+      return (<div className="content content--wide">
+          <TopBar pageName="Dashboard" store={globalStore} />
+          <DashboardView />
+        </div>);
     }
   },
   render: function() {
-    if (this.props.url) {
-      var i;
-      var segments = this.props.url.split('/');
-      var activeNodes = [ { node: this.routeTrie, params: [] } ];
-      for (i = 0; i < segments.length && activeNodes.length; ++i) {
-        var s = segments[i];
-        var nodeCount = activeNodes.length;
-        var newNodes = [];
-        for (var ii = 0; ii < nodeCount; ++ii) {
-          var n = activeNodes[ii];
-          if (s in n.node.children) {
-            newNodes.push({
-              node: n.node.children[s],
-              params: n.params
-            });
-          }
-          if ('*' in n.node.children) {
-            newNodes.push({
-              node: n.node.children['*'],
-              params: n.params.concat(s)
-            });
-          }
-        }
-        activeNodes = newNodes;
-      }
-
-      var leafNode = null;
-      for (i = 0; i < activeNodes.length && !leafNode; ++i) {
-        if (activeNodes[i].node.handler) leafNode = activeNodes[i];
-      }
-
-      if (leafNode) {
-        console.log("matched routes and found: ", activeNodes);
-        return activeNodes[0].node.handler.call(this, leafNode.params);
-      } else {
-        console.error("Could not find matching route for ", this.props.url, activeNodes);
-        return null;
-      }
+    if (typeof this.props.route == 'string') {
+      assert(this.props.route in this.routes);
+      return this.routes[this.props.route](this.props.params);
     } else {
-      return this.specialRoutes.default();
+      return null;
     }
   }
 });
 
 
-var TopMenu = React.createClass({
+var RouteLink = React.createClass({
+  handleClick: function(e) {
+    /// TODO: only do this with primary mouse button..
+    e.preventDefault();
+    changeRoute(globalStore, globalRouteTrie, this.props.path)
+    return false;
+  },
   render: function() {
-    var path = globalStore.getState().routePath;
-    var options = [
-      {
-        label: 'dashboard',
-        path: ''
-      },
-      {
-        label: 'rules',
-        path: 'rules'
-      }
-    ];
-
-    return (<ul className="topMenu">
-        {options.map(i => <li className={"menu-item" + (i.path==path ? " menu-item--active" : "")}>
-            <RouteLink path={i.path}>{i.label}</RouteLink>
-          </li>)}
-      </ul>);
+    var className = this.props.className;
+    if (!className) className = "link";
+    return <a className={className} href={this.props.path} onClick={this.handleClick}>{this.props.children}</a>
   }
 });
 
@@ -764,13 +780,13 @@ var UserCreationForm = React.createClass({
     if (! 'username' in errs) errs['username'] = null;
     if (! 'password' in errs) errs['password'] = null;
 
-    return <form className="newUserForm" onSubmit="handleSubmit">
+    return <form className="newUserForm" onSubmit={this.handleSubmit}>
       {<ErrorList field="form" errors={errs['form']} />}
       <label className="label-input-pair" htmlFor={idPrefix + 'usernam-field'}>
         <span className="o-label">Username</span>
-        <input id={idPrefix + 'username-field'} 
+        <input id={idPrefix + 'username-field'}
           className="o-input"
-          name="username" 
+          name="username"
           onChange={this.saveInputChange}
           placeholder="keen_commando33"
           required="required"/>
@@ -778,24 +794,37 @@ var UserCreationForm = React.createClass({
       </label>
       <label className="label-input-pair" htmlFor={idPrefix + 'password-field'}>
         <span className="o-label">Password</span>
-        <input id={idPrefix + 'password-field'} 
+        <input id={idPrefix + 'password-field'}
           className="o-input"
-          name="password" onChange={this.saveInputChange} 
-          type="password" 
+          name="password" onChange={this.saveInputChange}
+          type="password"
           placeholder="s3cret"
           required="required"/>
         {<ErrorList field="form" errors={errs['password']} />}
       </label>
       <label className="label-input-pair" htmlFor={idPrefix + 'email-field'}>
         <span className="o-label">Email</span>
-        <input id={idPrefix + 'email-field'}  
+        <input id={idPrefix + 'email-field'}
           className="o-input"
-          name="email" 
-          onChange={this.saveInputChange} 
+          name="email"
+          onChange={this.saveInputChange}
           type="email"
           placeholder="keen33@space-federation.com"
           required="required"/>
         {<ErrorList field="form" errors={errs['email']} />}
+      </label>
+      <label className="label-input-pair" htmlFor={idPrefix + 'alpha-code'}>
+        <span className="o-label">Access Code</span>
+        <input id={idPrefix + 'alpha-code'}
+          className="o-input"
+          name="alpha_code"
+          onChange={this.saveInputChange}
+          type="text"
+          maxLength="8"
+          minLength="8"
+          placeholder="koead23n$"
+          required="required"/>
+        {<ErrorList field="form" errors={errs['alpha_code']} />}
       </label>
       <input type="submit" className="o-btn" value="Sign Up" />
     </form>
@@ -856,12 +885,12 @@ var LoginForm = React.createClass({
 
 var AuthorizationView = React.createClass({
   getInitialState: function() {
-    return { 
+    return {
       showLogin: true
     };
   },
-  login: function(username, password, keep) { logIn(globalStore, username, password, keep) },
-  logout: function() { logOut(globalStore); },
+  login: function(username, password, keep) { logIn(this.props.store, username, password, keep) },
+  logout: function() { logOut(this.props.store); },
   createUser: function() {},
   onSubmit: function() {},
 
@@ -870,16 +899,19 @@ var AuthorizationView = React.createClass({
   render: function() {
     var toggleFormLabel, submitLabel, formItems;
     if (this.state.showLogin) {
-      formItems = (<LoginForm onSubmit={this.login} error={globalStore.getState().session.error}/>);
+      formItems = (<LoginForm onSubmit={this.login} error={this.props.store.getState().session.error}/>);
       submitLabel = "Log In";
       toggleFormLabel = "create an account instead";
     } else {
       formItems = (<UserCreationForm />);
       submitLabel = "Sign Up";
       toggleFormLabel = "log in instead";
-    } 
-    return <section className="view_unauthorised content">
-        <h1 className="heading">Conquered Space</h1>
+    }
+    return <section className="v-authorization content">
+        <h1 className="heading">
+          <canvas ref={updateLogoRenderTarget} className="logo-surface" width="100" height="100"></canvas>
+          <span className="heading-text">Conquered Space</span>
+        </h1>
         { formItems }
         <a className="toggle-auth-form" onClick={this.toggleShowLogin}>{toggleFormLabel}</a>
       </section>
@@ -909,15 +941,16 @@ var GameRequestForm = React.createClass({
       error = <p className="field-error">{this.props.error.message}</p>;
     }
     return <form onSubmit={this.handleSubmit}>
-        <label>
-          Opponent:
+        <label className="label-input-pair">
+          <span className="o-label">Opponent</span>
           <input name="opponentName"
+            className="o-input"
             onChange={this.saveInputChange}
             value={this.state.opponentName}
             placeholder="username"
             required/>
         </label>
-        <input type="submit" value="request" />
+        <input className="o-btn" type="submit" value="invite" />
         {error}
       </form>
   }
@@ -934,7 +967,7 @@ var NOTIFICATIONS = {
 
 var notificationMessages = [
   { //v0
-    GAME_REQUEST_RECEIVED: "$2 challenges you to a game.",
+    GAME_REQUEST_RECEIVED: "$1 challenges you to a game.",
     GAME_REQUEST_ACCEPTED: "$2 accepted your challenge.",
     GAME_REQUEST_REJECTED: "$2 rejected your challenge.",
     OPPONENT_PLAYED_PIECE: "$2 played a $3 at ($4, $5).",
@@ -1018,7 +1051,7 @@ var Notification = React.createClass({
     switch (type) {
       case 'GAME_REQUEST_RECEIVED': {
         content = (<div className={classes}>
-            {format(messageFormat, props.parameters[1])}
+            {format(messageFormat, idToUsername(state, props.parameters[1]))}
             <button onClick={this.acceptGameRequest}>Accept</button>
             <button onClick={this.rejectGameRequest}>Reject</button>
           </div>);
@@ -1056,65 +1089,85 @@ var Notification = React.createClass({
 var GameRow = React.createClass({
   render: function() {
     var game = this.props.game;
-    var state = globalStore.getState();
-    var playerLabels = this.props.game.players.map((player, i) => <span className="player-label player--{i + 1}">{state.users[player].username}</span>);
-    if (state.session.userId && state.session.userId == this.props.game.players[1]) {
-      playerLabels[1] = playerLabels[0];
-    }
-
-    var lastMove = null;
-    if (game.moves.length) {
-      var move = peek(game.moves);
-      var username = state.users[move.playerId].username;
-      var moveText;
-      switch (move.type) {
-          case MOVES.RESIGN: {
-            moveText = game.moves.length == 2 ? "$1 did not accept the challenge" : "$1 resigned";
-            moveText = format(moveText, username);
-          } break;
-          case MOVES.JOIN: {
-            moveText = game.moves.length == 1 ? "$1 created the game" : "$1 accepted the challenge";
-            moveText = format(moveText, username);
-          } break;
-          case MOVES.MOVE: {
-            moveText = "$1 moved a piece from ($2) to ($3)";
-            moveText = format(moveText, username,
-              move.from.join(', '), move.to.join(', '));
-          } break;
-          case MOVES.PLAY_MOTHERSHIP:
-          case MOVES.PLAY_SCOUT:
-          case MOVES.PLAY_SHIFTER: {
-            var shipType = shipFromMove(move.type);
-            var label = shipLabels[shipType];
-
-            moveText = format("$1 placed a $2 at ($3)", username,
-              label, move.to.join(', '));
-
-          } break;
-          default: {
-            moveText = "UNKNOWN MOVE TYPE";
-          }
-      }
-      lastMove = (<span className="lastMove">
-          <span className="lastMove-label">Last move: </span>
-          <span className="lastMove-move">{moveText}</span>
-        </span>);
-    }
-
-    return <li>
-      <RouteLink path={"games/" + game.id}> go to game </RouteLink>
-        {state.session.userId ? null : playerLabels[0]} <span className="versus-label">vs.</span> {playerLabels[1]}
-        {lastMove}
-      </li>
+    
   }
 });
 var GameListing = React.createClass({
   render: function() {
-    return <ul className="game-listing">
-        {this.props.games
-          .filter(game => game.started && !game.ended)
-          .map((game) => <GameRow key={game.id} game={game} />)}
-      </ul>
+    var games = this.props.games;
+    if (games && games.length) {
+      var gameRows = [];
+      for (var i = 0; i < games.length; ++i) {
+        var game = games[i];
+        var state = globalStore.getState();
+        var opponentName;
+        if (state.session.userId == game.playersInOrder[0]) {
+          opponentName = state.users[game.playersInOrder[1]].username;
+        } else {
+          opponentName = state.users[game.playersInOrder[0]].username;
+        }
+
+        var moveText = '---';
+        if (game.moves.length) {
+          var move = peek(game.moves);
+          var username = state.users[move.playerId].username;
+          switch (move.type) {
+              case MOVES.RESIGN: {
+                moveText = game.moves.length == 2 ? "$1 did not accept the challenge" : "$1 resigned";
+                moveText = format(moveText, username);
+              } break;
+              case MOVES.JOIN: {
+                moveText = game.moves.length == 1 ? "$1 created the game" : "$1 accepted the challenge";
+                moveText = format(moveText, username);
+              } break;
+              case MOVES.MOVE: {
+                moveText = "$1 moved a piece from ($2) to ($3)";
+                moveText = format(moveText, username,
+                  move.from.join(', '), move.to.join(', '));
+              } break;
+              case MOVES.PLAY_MOTHERSHIP:
+              case MOVES.PLAY_SCOUT:
+              case MOVES.PLAY_SHIFTER: {
+                var shipType = shipFromMove(move.type);
+                var label = shipLabels[shipType];
+
+                moveText = format("$1 placed a $2 at ($3)", username,
+                  label, move.to.join(', '));
+
+              } break;
+              default: {
+                moveText = "UNKNOWN MOVE TYPE";
+              }
+          }
+        }
+        gameRows.push(<tr className="table-row">
+            <td className="table-cell">
+              <span className="opponent-name">{opponentName}</span>
+            </td>
+            <td className="table-cell">
+              <span className="lastMove-move">{moveText}</span>
+            </td>
+            <td className="table-cell">
+              <RouteLink className="o-btn o-btn--small" path={"games/" + game.id}> go to game </RouteLink>
+            </td>
+          </tr>);
+      }
+      return <table className="game-listing">
+        <thead>
+          <td className="o-table-heading">
+            Playing with
+          </td>
+          <td className="o-table-heading">
+            Last move
+          </td>
+        </thead>
+        <tbody>
+          {gameRows}
+        </tbody>
+        </table>
+    } else {
+      return null;
+    }
   }
 });
 
@@ -1153,44 +1206,15 @@ var PollIndicator = React.createClass({
 });
 
 var Page = React.createClass({
-  renderNotificationList: function(notifications) {
-    return (<ol className="notification-list">
-        {mapOver(notifications, function(n) {
-          if (!n.read) {
-            return (<li key={n.id}><Notification {...n} /></li>);
-          }
-        })}
-      </ol>);
-  },
-
   renderHomepage: function() {
-    var self = this;
     var state = this.props.store.getState();
-    var notifications = mapOver(state.session.unreadNotificationIds, function(id) { return state.notifications[id]; });
-
     return (<div>
-        <div className="topbar">
-          <p className="hi">
-            Hi {state.session.username || (<span className="intruder">UNKNOWN INTRUDER</span>)}
-            <button className="button logout-button" onClick={this.logout}>Log Out</button>
-          </p>
-            
-          <PollIndicator store={this.props.store} />
-          <TopMenu />
-          {this.renderNotificationList(notifications)}
-        </div>
-
-        <div style={{border: "1px solid black"}}>
-          <Router url={state.routePath} />
-        </div>
+        <Router route={state.route.name} params={state.route.params} />
       </div>);
-  },
-  renderUnauthenticated: function() {
-    return <AuthorizationView />
   },
 
   render: function() {
-    return isSessionValid(this.props.store.getState().session) ? this.renderHomepage() : this.renderUnauthenticated();
+    return isSessionValid(this.props.store.getState().session) ? this.renderHomepage() : <AuthorizationView store={globalStore} />;
   }
 });
 

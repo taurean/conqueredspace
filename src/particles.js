@@ -188,41 +188,33 @@ function initParticles() {
 
 
   var hexagons = (function() {
-    var renderTarget = document.getElementById("logo-background");
-    if (!renderTarget) return function() {}
-    var ctx = renderTarget.getContext("2d");
-    var w = renderTarget.width;
-    var h = renderTarget.height;
+    
     var loadingT = false;
     var loadingPercent = 0;
 
-    var r;
+    var renderTarget, ctx;
+    var r, w, h;
     var n = 6;
     var outerPoints;
-    function setDimsAndOutline() {
-      ctx.translate(w/2, h/2);
-      r = Math.min(w, h)/2*0.8;
-      outerPoints = Array(n);
-      for (var i = 0; i < n; ++i) outerPoints[i] = [r*Math.cos(i*TAU/n), r*Math.sin(i*TAU/n)];
-    }
-    setDimsAndOutline();
-
-    function lerpRgba(rgba1, rgba2, t) {
-        var colorComponents = Array(4);
-        colorComponents[0] = Math.round(lerp(rgba1[0], rgba2[0], t));
-        colorComponents[1] = Math.round(lerp(rgba1[1], rgba2[1], t));
-        colorComponents[2] = Math.round(lerp(rgba1[2], rgba2[2], t));
-        colorComponents[3] = lerp(rgba1[3], rgba2[3], t);
-        return 'rgba(' + colorComponents.join(',') + ')';
+    window.updateLogoRenderTarget = function(target) {
+      renderTarget = target;
+      if (target) {
+        ctx = renderTarget.getContext("2d");
+        w = renderTarget.width;
+        h = renderTarget.height;
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "red";
+        ctx.translate(w/2, h/2);
+        r = Math.min(w, h)/2*0.8;
+        outerPoints = Array(n);
+        for (var i = 0; i < n; ++i) outerPoints[i] = [r*Math.cos(i*TAU/n), r*Math.sin(i*TAU/n)];
+      }
     }
 
     function index(i) { return (i + n) % n; }
-
-    var outerColor = [33, 168, 214, 1];
-    var innerColor = [202, 65, 56, 1];
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = "red";
     function hexagons(t, dt) {
+      if (!renderTarget) return;
+
       var i, j;
       if (loadingPercent < 1) {
         loadingPercent += dt/500;

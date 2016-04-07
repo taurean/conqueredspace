@@ -70,6 +70,9 @@ TODO:
     - store move
     - resign
 
+
+  - Check if start ship count and player order still work.
+
 */
 function gameReduxer(state, action) {
   function applyMoves(state, moves) {
@@ -128,14 +131,22 @@ function gameReduxer(state, action) {
 
   switch (action.type) {
     case GAME_ACTIONS.LOAD: {
+
+      var playersById = {};
+      for (var i = 0; i < action.playersInOrder.length; ++i) {
+        var p = action.playersInOrder[i];
+        p.order = i;
+        playersById[p.id] = p
+      }
       var newState = {
         id: action.id,
         turnCount: 0,
         turnOffset: 0,
         spatialMap: { },
         pieces: [],
-        playersById: action.playersById,
-        playersInOrder: [],
+        playersById: playersById,
+        playersInOrder: action.playersInOrder,
+        startShipCount: action.startShipCount,
         selected: null,
         lastMoveCreated: 0
       };
@@ -164,16 +175,8 @@ function gameReduxer(state, action) {
       var newState = assign({ }, state);
       var player = state.playersById[action.playerId];
       assign(player, {
-        order: newState.playersInOrder.length,
         playing: true,
-        nest: {
-          MOTHERSHIP: 1,
-          SCOUT:      3,
-          SHIFTER:    2,
-          HOPPER:     3,
-          CRAWLER:    3,
-          SPIDER:     2
-        }
+        nest: assign({}, state.startShipCount)
       });
 
       newState.playersInOrder.push(player);

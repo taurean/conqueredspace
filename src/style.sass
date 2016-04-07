@@ -32,12 +32,18 @@ $font-stack-serif: "Mercury SSm A", "Mercury SSm B", serif;
   box-sizing: border-box;
 }
 
+html {
+  font: 500 10px/1.5 $font-stack-sans;
+  font-size: 10px;
+}
 html, body {
   padding: 0;
   margin: 0;
   background: black;
   color: white;
-  font: 500 10px/1.5 $font-stack-sans;
+}
+body {
+  font-size: 2rem;
 }
 
 ul, ol, li {
@@ -46,32 +52,104 @@ ul, ol, li {
   margin: 0;
 }
 
-.topBar {
-  position: relative;
+
+.l-g2, .l-g3, .l-g4 {
+  &:after {
+    content: '';
+    display: block;
+    clear: both;
+  }
 }
-.topBar:after {
+
+.l-g2 > * {
+  display: block;
+  float: left;
+  width: 50%;
+}
+
+.c-topbar {
+  position: relative;
+
+  & .primary {
+    border-bottom: .1rem solid gray;
+    margin-bottom: .5rem;
+  }
+  & .primary > * {
+    vertical-align: middle;
+    width: 33.33%;
+    display: inline-block;
+  }
+
+  & .secondary {
+    line-height: 2rem;
+  }
+
+  .top-nav {
+    text-align: right;
+    float: right;
+  }
+}
+.c-topbar:after {
     content: '';
     display: block;
     clear: both;
 }
 
-.hi {
-    margin-bottom: 0;
-}
+  .o-page-name {
+    font-size: 2.5rem;
+  }
+  .hi {
+    margin: 0;
+    text-align: right;
+    font: 400 2.5rem/1.2 $font-stack-sans;
+  }
+  .logout {
+    font-size: 0.8em;
+    color: gray;
+  }
+
+  .o-menu-item {
+    margin-left: 1rem;
+  }
 
 .pollIndicator {
-  position: absolute;
-  left: .75rem;
-  bottom: 1.6rem;
-  display: block;
-  width: .3rem;
-  height: .3rem;
-  background: blue;
-  transition: background 3s ease-out;
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+  width: 2rem;
+  height: 2rem;
+  border-radius: .9rem;
+  border: .1rem solid red;
 }
-.pollIndicator--busy {
+.pollIndicator:before {
+  content: '';
+  display: block;
+  position: absolute;
+  top: .6rem;
+  left: .6rem;
+  width: .6rem;
+  height: .6rem;
+  border-radius: .3rem;
   background: red;
-  transition: none;
+}
+.pollIndicator:after {
+  content: '';
+  opacity: 0.1;
+  transition: transform 3s, opacity .3s 2.5s;
+  position: absolute;
+  top: calc((1.8rem - .1rem) / 2);
+  left: calc(1.8rem / 2);
+  display: block;
+  width: 1.2rem;
+  height: .2rem;
+  background: red;
+  transform: rotateZ(0);
+  transform-origin: center left;
+}
+.pollIndicator--busy:after {
+  transform: rotateZ(360deg);
+  transition: opacity .1s;
+  opacity: 1;
 }
 
 .label-input-pair {
@@ -161,6 +239,7 @@ ul, ol, li {
   &:active {
     background-image: linear-gradient(-180deg, #0F6BBF 0%, #00C1FF 100%);
   }
+
 }
 
 .toggle-auth-form {
@@ -194,12 +273,41 @@ ul, ol, li {
   letter-spacing: .3ex;
   text-transform: lowercase;
   font: 500 3rem/1 $font-stack-sans-SC;
+  position: relative;
+  height: 100px;
+  margin: 0;
+}
+
+.heading-text {
+    position: relative;
+    top: 0;
+    vertical-align: middle;
+    line-height: 100px;
+    transition: opacity .8s .2s ease, top .5s .2s ease, letter-spacing .5s .2s;
+}
+
+.loading .heading-text {
+    opacity: 0;
+    top: 5px;
+    letter-spacing: 10px;
+}
+
+.logo-surface {
+    position: absolute;
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    height: 100%;
 }
 
 .content {
   position: relative;
   max-width: 41.2rem;
-  margin: 15rem auto 0;
+  margin: 0 auto 0;
+}
+
+.content--wide {
+  max-width: 100rem;
 }
 
 .o-error {
@@ -211,7 +319,7 @@ p {
 }
 
 #particle-surface {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   pointer-events: none;
@@ -222,14 +330,7 @@ p {
 .notification-list {
     list-style: none;
     float: left;
-    overflow: hidden;
-    max-height: 2rem;
     position: relative;
-}
-.notification-list--open,
-.notification-list:hover {
-    max-height: 80vh;
-    overflow: auto;
 }
 
 .notification-list li:before {
@@ -262,6 +363,11 @@ p {
     transform:scale(1.1);
 }
 
+
+.v-authorization {
+  margin-top: 15rem;
+}
+
 /*                                         *
  *               GAME STYLES               *
  *                                         */
@@ -273,13 +379,8 @@ p {
   .nest--activePlayer {
     stroke: pink;
   }
-  .nest--p1 .nest-player {
+  .nest-player {
     fill: white;
-    stroke: black;
-    stroke-width: 2px;
-  }
-  .nest--p2 .nest-player {
-    fill: black;
   }
 
   .nest-background { fill: transparent; stroke: transparent; }

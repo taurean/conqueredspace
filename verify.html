@@ -1,0 +1,36 @@
+<!DOCTYPE <!DOCTYPE html>
+<html>
+<head>
+  <title>Verify your account</title>
+  <base href="/" />
+  <script type="text/javascript" src="config.js"></script>
+  <script type="text/javascript" src="lib/react.js"></script>
+  <script type="text/javascript" src="build/math.js"></script>
+  <script type="text/javascript" src="build/utils.js"></script>
+  <script type="text/javascript" src="build/particles.js"></script>
+
+  <script type="text/javascript">
+    function _onPageLoad() {
+      var code = window.location.search.substr(1); // the search begins with ?
+      assert(code.length == 8, "invalid verification code");
+
+
+      PUT(BASE_URL + 'verifications/' + code, { value: true }, function(status, payload) {
+        if (statusOK(status)) {
+          // redirect to the thing
+          window.location = document.baseURI;
+        } else {
+          console.error('something went wrong', status, payload);
+        }
+      })
+    }
+  </script>
+
+  <link rel="stylesheet" type="text/css" href="https://cloud.typography.com/6165274/7359352/css/fonts.css" />
+  <link rel="stylesheet" href="build/styles.css">
+</head>
+<body onload="_onPageLoad()" class="loading">
+  <canvas id="particle-surface"></canvas>
+  <div id="pageBody"></div>
+</body>
+</html>
