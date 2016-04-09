@@ -9,6 +9,10 @@
     - ...
 */
 
+var roles = {
+  user: 1 << 0,
+  admin: 1 << 1,
+}
 
 function authHeader(state) {
   return { Authorization: 'BEARER ' + state.session.tokenString};
@@ -67,6 +71,8 @@ function trieWalkKeys(node, prefix) {
 var urls = {
   users: BASE_URL + 'users',
   userGames: (uid => [urls.users, uid, 'games'].join('/')),
+
+  alphaCodes: BASE_URL + 'alpha-codes',
 
   games: BASE_URL + 'games',
   gameMoves: (gid => [urls.games, gid, 'moves'].join('/')),
@@ -149,6 +155,9 @@ var initialState = {
     tokenString: null,
     user: null,
     expiration: 0,
+    id: null,
+    username: null,
+    roles: 0,
     errors: []
   },
   errors: [],
@@ -244,6 +253,7 @@ function rootReduxer(state, action) {
       tokenString: action.session.tokenString,
       userId: action.session.data.uid,
       username: action.session.data.sub,
+      roles: action.session.data.roles,
       expiration: action.session.data.exp,
       errors: []
     });
@@ -559,12 +569,130 @@ var DashboardView = React.createClass({
   }
 });
 
+var AdminView = React.createClass({
+  _nextPage: function() { this._loadPage(this.state.offset - this.state.limit); },
+  _prevPage: function() { this._loadPage(this.state.offset + this.state.limit); },
+  _refresh: function() { this._loadPage(this.state.offset, true); },
+  _loadPage: function(newOffset, reload){
+    if (this.state.loading) return;
+
+    newOffset = Math.max(newOffset, 0);
+    if (this.state.offset == newOffset && !reload) return;
+
+    this.setState({ loading: true });
+
+    var payload = {
+      offset:  newOffset,
+      limit:   this.state.limit,
+      orderBy: this.state.orderBy,
+      order:   this.state.order,
+    };
+    var self = this;
+    GET(urls.alphaCodes, payload, function(status, data) {
+      self.setState({ loading: false });
+      if (statusOK(status)) {
+        try {
+          data = JSON.parse(data);
+          self.setState({
+            offset: newOffset,
+            rows: data,
+          });
+        } catch(e) {
+          console.error("Problem parsing fetched alpha codes, ", e)
+        }
+      }
+
+      /// TODO: warn the user something went wrong.
+    }, authHeader(this.props.store.getState()));
+  },
+
+
+  _newCode: function() {
+    if (this.state.creatingCode) return;
+
+    var self = this;
+    var payload = { count: 1 };
+    POST(urls.alphaCodes, payload, function(status, data) {
+      if (statusOK(status)) {
+        self._refresh();
+      } else {
+        /// TODO: warn the user something went wrong.
+      }
+    }, authHeader(this.props.store.getState()));
+  },
+
+  getInitialState: function() {
+    return {
+      creatingCode: false,
+      loading: false,
+      offset:  0,
+      limit:   25,
+      orderBy: 'generation_time',
+      order:   'ASC',
+      /// TODO: add filters for just seeing free or used or pending codes
+
+      rows: []
+    };
+  },
+  componentWillMount: function() { this._loadPage(0, true); },
+  render: function() {
+    var rowCount = this.state.rows.length;
+    var renderedRows = Array(rowCount);
+    for (var i = 0; i < rowCount; ++i) {
+      var r = this.state.rows[i];
+      var u = r.user || {
+        created: "---",
+        username: "---",
+        email: "---",
+      };
+      var className = "";
+      if (!r.user) { className += " empty"; }
+      renderedRows[i] = (<tr>
+          <td>{r.generated}</td>
+          <td>{r.alphaCode}</td>
+          <td className={className}>{u.created}</td>
+          <td className={className}>{u.username}</td>
+          <td className={className}>{u.email}</td>
+          <td className={className}>{(u.roles & roles.user) > 0 ? "X" : ""}</td>
+        </tr>);
+    }
+    return (<div>
+      <a className="o-btn o-btn--inline" onClick={this._prevPage}>&lt;</a>
+      <a className="o-btn o-btn--inline" onClick={this._refresh}>Refresh</a>
+      <a className="o-btn o-btn--inline" onClick={this._nextPage}>&gt;</a> 
+      <a className="o-btn o-btn--inline" onClick={this._newCode}>+</a> 
+      <table className="alpha-codes">
+        <thead>
+          <tr>
+          <td className="o-table-heading">Generated</td>
+          <td className="o-table-heading">Code</td>
+          <td className="o-table-heading">Signed up on</td>
+          <td className="o-table-heading">Username</td>
+          <td className="o-table-heading">Email</td>
+          <td className="o-table-heading">Verified</td>
+          </tr>
+        </thead>
+        <tbody>
+          {renderedRows}
+        </tbody>
+      </table>
+      </div>);
+  }
+});
+
+
 var TopBar = React.createClass({
   logout: function() {
     logOut(this.props.store);
   },
   render: function() {
     var state = this.props.store.getState();
+    var adminViews = null;
+    if ((state.session.roles & roles.admin) > 0) {
+      adminViews = [
+        <RouteLink className="o-menu-item" path="alpha-codes">Alpha codes</RouteLink>
+      ];
+    }
 
     return (<div className="c-topbar">
       <div className="primary">
@@ -583,6 +711,7 @@ var TopBar = React.createClass({
         <PollIndicator store={this.props.store} />
         
         <nav className="top-nav">
+          { adminViews }
           <a className="o-menu-item">Notifications</a>
           <a className="o-menu-item">Rules</a>
         </nav>
@@ -592,14 +721,43 @@ var TopBar = React.createClass({
 })
 
 
-function changeRoute(store, routingTrie, route) {
-  var matchedRoute = routingTrie.value;
+function noop(){}
+function authorize(state) {
+  var session = state.session;
+  if (isSessionValid(session)) {
+    return;
+  } else {
+    return 'authorize';
+  }
+}
+function adminOnly(state, previous) {
+  var session = state.session;
+  if (isSessionValid(session)) {
+    if ((session.roles & roles.admin) > 0) {
+      return
+    } else {
+      return '';
+    }
+  } else {
+    return 'authorize';
+  }
+}
+
+
+var onRouteEnter = { 
+  '': noop,
+  '/': noop,
+  'games/*': authorize,
+  'alpha-codes': adminOnly
+};
+function changeRoute(store, rootNode, route) {
+  var matchedRoute = rootNode.value;
   var matchedParams = [];
   var foundMatch = false;
   if (route && route.length) {
     var i;
     var segments = route.split('/');
-    var activeNodes = [ { node: routingTable.rootNode, params: [] } ];
+    var activeNodes = [ { node: rootNode, params: [] } ];
     for (i = 0; i < segments.length && activeNodes.length; ++i) {
       var s = segments[i];
       var nodeCount = activeNodes.length;
@@ -629,7 +787,7 @@ function changeRoute(store, routingTrie, route) {
 
     if (leafNode) {
       console.log("matched routes and found: ", leafNode);
-      matchedRoute = leafNode.value;
+      matchedRoute = leafNode.node.value;
       matchedParams = leafNode.params;
       foundMatch = true;
     } else {
@@ -637,7 +795,9 @@ function changeRoute(store, routingTrie, route) {
     }
   }
 
-  if (!foundMatch) route = '';
+  if (!foundMatch) matchedRoute = '';
+  var redirect = onRouteEnter[matchedRoute](store.getState());
+  if (typeof redirect == "string") matchedRoute = redirect;
 
 
   store.dispatch({
@@ -652,7 +812,7 @@ var globalRouteTrie;
 function initRouteSystem(store, routes, specialRoutes) {
   //var router = buildRoutes(routes);
 
-  var routes = [ '', 'games/*' ];
+  var routes = [ '', 'games/*', 'alpha-codes' ];
 
   globalRouteTrie = { children: { } };
   for (var k in routes) {
@@ -680,6 +840,12 @@ function initRouteSystem(store, routes, specialRoutes) {
   });
 }
 
+function renderDefault(params) {
+  return (<div className="content content--wide">
+      <TopBar pageName="Dashboard" store={globalStore} />
+      <DashboardView />
+    </div>);
+}
 var Router = React.createClass({
   routeTrie: null,
   routes: {
@@ -689,12 +855,14 @@ var Router = React.createClass({
           <GameView id={parseInt(params[0])} store={gameStore} />
         </div>);
     },
-    "": function(params) {
+    "alpha-codes": function() {
       return (<div className="content content--wide">
-          <TopBar pageName="Dashboard" store={globalStore} />
-          <DashboardView />
+          <TopBar pageName="Alpha codes" store={globalStore} />
+          <AdminView store={globalStore} />
         </div>);
-    }
+    },
+    "/": renderDefault,
+    "": renderDefault,
   },
   render: function() {
     if (typeof this.props.route == 'string') {
