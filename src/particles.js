@@ -1,27 +1,4 @@
 function initParticles() {
-  function startLoop(eventSource, simFn) {
-    var handle;
-
-    var lastUpdate;
-    function initTimeAndLoop(t){
-      lastUpdate = t;
-      handle = window.requestAnimationFrame(loop);
-    }
-    function loop(t) {
-
-      /// TODO: poll input
-      var dt = t - lastUpdate;
-      lastUpdate = t;
-      handle = window.requestAnimationFrame(loop);
-      simFn(t, dt);
-    }
-
-    window.requestAnimationFrame(initTimeAndLoop);
-    return function() {
-      window.cancelAnimationFrame(handle);
-    }
-  }
-
   var sectorWidth = 250;
   var sectorHeight= 250;
   var sectorDepth = 100;
@@ -133,8 +110,8 @@ function initParticles() {
   var ctx = renderTarget.getContext('2d');
   ctx.fillStyle = 'rgba(255,255,200,0.4)';
 
-  startLoop(document, function(t, dt) {
-    var cameraDP = sclV2(cameraSpeed, dt / 1000);
+  startLoop(function(input) {
+    var cameraDP = sclV2(cameraSpeed, input.dT / 1000);
     cameraP = addV2(cameraP, cameraDP);
     ctx.translate(-cameraDP[0], -cameraDP[1]);
     var sectorOffset = negV2(cameraP, topLeftSector);
@@ -169,8 +146,8 @@ function initParticles() {
           pX += (0.5 - m[0]/w)*pZ*100;
           pY += (0.5 - m[1]/h)*pZ*100;
           if (orientationMeasured) {
-            pX += (orientation[2] - orientationAnchor[2] + 90)/180*pZ*300;
-            pY += (orientation[1] - orientationAnchor[1] + 90)/180*pZ*300;
+            pX += (orientation[2] - orientationAnchor[2] + 90)/180*pZ*500;
+            pY += (orientation[1] - orientationAnchor[1] + 90)/180*pZ*500;
           }
           var x = s[k][0] - pX;
           var y = s[k][1] - pY;
@@ -194,24 +171,22 @@ function initParticles() {
 
     var renderTarget, ctx;
     var r, w, h;
-    var n = 6;
-    var outerPoints;
+    var schlafliSymbol = 6;
     window.updateLogoRenderTarget = function(target) {
       renderTarget = target;
       if (target) {
         ctx = renderTarget.getContext("2d");
         w = renderTarget.width;
         h = renderTarget.height;
-        ctx.lineWidth = 1;
         ctx.strokeStyle = "red";
         ctx.translate(w/2, h/2);
-        r = Math.min(w, h)/2*0.8;
-        outerPoints = Array(n);
-        for (var i = 0; i < n; ++i) outerPoints[i] = [r*Math.cos(i*TAU/n), r*Math.sin(i*TAU/n)];
+        r = Math.min(w, h)/2;
+        ctx.scale(r, r);
+        ctx.lineWidth = 1/r;
       }
     }
 
-    function index(i) { return (i + n) % n; }
+    function index(i) { return (i + schlafliSymbol) % schlafliSymbol; }
     function hexagons(t, dt) {
       if (!renderTarget) return;
 
@@ -220,11 +195,11 @@ function initParticles() {
         loadingPercent += dt/500;
 
         ctx.clearRect(-w/2, -h/2, w, h);
-        ctx.moveTo(outerPoints[0][0], outerPoints[0][1]);
-        for (j = 0; j < n; j++) {
+        ctx.moveTo(unityHexagon[0][0], unityHexagon[0][1]);
+        for (j = 0; j < schlafliSymbol; j++) {
           ctx.beginPath();
-          var a = outerPoints[index(j - 1)];
-          var b = outerPoints[index(j)];
+          var a = unityHexagon[index(j - 1)];
+          var b = unityHexagon[index(j)];
           var ab = negV2(b, a);
 
           ab = addV2(a, sclV2(ab, sqr(loadingPercent)));
@@ -245,10 +220,10 @@ function initParticles() {
         var bezierStages = Array(stageCount);
         var d = (t - loadingT) / 1500; 
         d = Math.min(d*d, 0.1)
-        bezierStages[0] = outerPoints;
+        bezierStages[0] = unityHexagon;
         for (i = 1; i < stageCount; ++i) {
-            var stage = Array(n);
-            for (var j = 0; j < n; ++j) {
+            var stage = Array(schlafliSymbol);
+            for (var j = 0; j < schlafliSymbol; ++j) {
                 var a = bezierStages[i - 1][index(j - 1)];
                 var b = bezierStages[i - 1][index(j)];
                 var ab = negV2(b, a);
@@ -262,7 +237,7 @@ function initParticles() {
         for (i = 0; i < stageCount; ++i) {
             ctx.beginPath();
             ctx.moveTo(bezierStages[i][0][0], bezierStages[i][0][1]);
-            for (j = 1; j < n; j++) {
+            for (j = 1; j < schlafliSymbol; j++) {
                 ctx.lineTo(bezierStages[i][index(j)][0], bezierStages[i][index(j)][1]);
             }
             ctx.closePath();

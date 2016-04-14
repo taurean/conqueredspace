@@ -569,7 +569,12 @@ var DashboardView = React.createClass({
   }
 });
 
-var AdminView = React.createClass({
+
+///
+/// Admin views
+///
+
+var AlphaCodeManagerView = React.createClass({
   _nextPage: function() { this._loadPage(this.state.offset - this.state.limit); },
   _prevPage: function() { this._loadPage(this.state.offset + this.state.limit); },
   _refresh: function() { this._loadPage(this.state.offset, true); },
@@ -681,6 +686,153 @@ var AdminView = React.createClass({
 });
 
 
+var UserManagerView = React.createClass({
+  _nextPage: function() { this._loadPage(this.state.offset - this.state.limit); },
+  _prevPage: function() { this._loadPage(this.state.offset + this.state.limit); },
+  _refresh: function() { this._loadPage(this.state.offset, true); },
+  _loadPage: function(newOffset, reload){
+    if (this.state.loading) return;
+
+    newOffset = Math.max(newOffset, 0);
+    if (this.state.offset == newOffset && !reload) return;
+
+    this.setState({ loading: true });
+
+    var payload = {
+      offset:  newOffset,
+      limit:   this.state.limit,
+      orderBy: this.state.orderBy,
+      order:   this.state.order,
+    };
+    var self = this;
+    GET(urls.users, payload, function(status, data) {
+      self.setState({ loading: false });
+      if (statusOK(status)) {
+        try {
+          data = JSON.parse(data);
+          self.setState({
+            offset: newOffset,
+            rows: data,
+          });
+        } catch(e) {
+          console.error("Problem parsing fetched alpha codes, ", e)
+        }
+      }
+
+      /// TODO: warn the user something went wrong.
+    }, authHeader(this.props.store.getState()));
+  },
+
+
+  _newCode: function() {
+    if (this.state.creatingCode) return;
+
+    var self = this;
+    var payload = { count: 1 };
+    POST(urls.alphaCodes, payload, function(status, data) {
+      if (statusOK(status)) {
+        self._refresh();
+      } else {
+        /// TODO: warn the user something went wrong.
+      }
+    }, authHeader(this.props.store.getState()));
+  },
+
+  getInitialState: function() {
+    return {
+      creatingCode: false,
+      loading: false,
+      offset:  0,
+      limit:   25,
+      orderBy: 'generation_time',
+      order:   'ASC',
+      /// TODO: add filters for just seeing free or used or pending codes
+
+      editId: null,
+      editField: null,
+      editValues: {},
+
+      rows: []
+    };
+  },
+  changeField: function(e) {
+    var fieldId = e.target.name.split('.')
+    var editValues = this.state.editValues[fieldId[0]];
+    if (!editValues) {
+      editValues = this.state.editValues[fieldId[0]] = {};
+    }
+
+    function findRolesById(id) {
+      for (var i = 0; i < this.state.rows.length; ++i) {
+        if (this.state.rows[i].id == id) return this.state.rows[i].roles;
+      }
+      return 0;
+    }
+
+    var r;
+    switch(fieldId[1]) {
+      case 'verified': 
+        r = editValues.roles || findRolesById(fieldId[1]);
+        editValues['roles'] = r ^ roles.user;
+        break;
+      case 'admin':
+        r = editValues.roles || findRolesById(fieldId[1]);
+        editValues['roles'] = r ^ roles.admin;
+        break;
+      default: 
+        editValues[fieldId[1]] = e.target.value;
+    }
+
+    console.log('changing ' + e.target.name);
+    var _editValues = this.state.editValues;
+    _editValues[fieldId[0]] = editValues;
+    this.setState({ editValues: _editValues});
+  },
+  componentWillMount: function() { this._loadPage(0, true); },
+  render: function() {
+    var rowCount = this.state.rows.length;
+    var renderedRows = Array(rowCount);
+    for (var i = 0; i < rowCount; ++i) {
+      var u = this.state.rows[i];
+      var className = "";
+      var dU = this.state.editValues[u.id] || {};
+      dU = assign({}, u, dU);
+
+      renderedRows[i] = (<tr key={u.id}>
+          <td>{u.created}</td>
+          <td><input name={u.id + ".username"} className={"o-input " + (dU.username != u.username ? '--changed' : '')} onChange={this.changeField} value={dU.username} /></td>
+          <td><input name={u.id + ".email"}    className={"o-input " + (dU.email != u.email ? '--changed' : '')} onChange={this.changeField} value={dU.email} type="email" /></td>
+          <td><input name={u.id + ".verified"} className={"o-input " + (dU.roles & roles.user != u.roles & roles.user ? '--changed' : '')} onChange={this.changeField} type="checkbox" checked={dU.roles & roles.user} /></td>
+          <td><input name={u.id + ".admin"}    className={"o-input " + (dU.roles & roles.admin != u.roles & roles.admin ? '--changed' : '')} onChange={this.changeField} type="checkbox" checked={dU.roles & roles.admin} /></td>
+          <td><input name={u.id + ".password"} className={"o-input " + (dU.password ? '--changed' : '')} onChange={this.changeField} value={dU.password} type="password" /></td>
+        </tr>);
+    }
+    return (<form onSubmit={noop}>
+      <a className="o-btn o-btn--inline" onClick={this._prevPage}>&lt;</a>
+      <a className="o-btn o-btn--inline" onClick={this._refresh}>Refresh</a>
+      <a className="o-btn o-btn--inline" onClick={this._nextPage}>&gt;</a> 
+      <a className="o-btn o-btn--inline" onClick={this._newCode}>+</a> 
+      <table className="alpha-codes">
+        <thead>
+          <tr>
+          <td className="o-table-heading">Created</td>
+          <td className="o-table-heading">Username</td>
+          <td className="o-table-heading">Email</td>
+          <td className="o-table-heading">Verified</td>
+          <td className="o-table-heading">Admin</td>
+          <td className="o-table-heading">Password</td>
+          </tr>
+        </thead>
+        <tbody>
+          {renderedRows}
+        </tbody>
+      </table>
+      <input type="submit" className="o-btn" value="commit changes" />
+      </form>);
+  }
+});
+
+
 var TopBar = React.createClass({
   logout: function() {
     logOut(this.props.store);
@@ -690,7 +842,8 @@ var TopBar = React.createClass({
     var adminViews = null;
     if ((state.session.roles & roles.admin) > 0) {
       adminViews = [
-        <RouteLink className="o-menu-item" path="alpha-codes">Alpha codes</RouteLink>
+        (<RouteLink className="o-menu-item" path="admin/alpha-codes">Alpha codes</RouteLink>),
+        (<RouteLink className="o-menu-item" path="admin/user-list">Users</RouteLink>)
       ];
     }
 
@@ -748,7 +901,8 @@ var onRouteEnter = {
   '': noop,
   '/': noop,
   'games/*': authorize,
-  'alpha-codes': adminOnly
+  'admin/alpha-codes': adminOnly,
+  'admin/user-list': adminOnly,
 };
 function changeRoute(store, rootNode, route) {
   var matchedRoute = rootNode.value;
@@ -812,7 +966,7 @@ var globalRouteTrie;
 function initRouteSystem(store, routes, specialRoutes) {
   //var router = buildRoutes(routes);
 
-  var routes = [ '', 'games/*', 'alpha-codes' ];
+  var routes = [ '', 'games/*', 'admin/alpha-codes', 'admin/user-list' ];
 
   globalRouteTrie = { children: { } };
   for (var k in routes) {
@@ -829,15 +983,25 @@ function initRouteSystem(store, routes, specialRoutes) {
     currentNode.value = routes[k];
   }
 
-  var currentPath = store.getState().routePath;
-  var newPath = location.href.substr(document.baseURI.length);
-  changeRoute(store, globalRouteTrie, newPath);
+  function navigateToUrl() {
+    var newPath = location.href.substr(document.baseURI.length);
+    changeRoute(store, globalRouteTrie, newPath);
+  }
+
+  var currentPath = store.getState().route.path;
+  navigateToUrl();
+  window.onpopstate = navigateToUrl;
+
   store.subscribe(function(state, dispatch, action) {
-    if(action.type === ACTIONS.ROUTE && state.routePath != currentPath) {
-      history.pushState({}, "", state.routePath);
-      currentPath = state.routePath;
+    if(action.type === ACTIONS.ROUTE && state.route.path != currentPath) {
+      history.pushState({}, "", state.route.path);
+      currentPath = state.route.path;
     }
   });
+}
+
+window.onpopstate = function() {
+  debugger;
 }
 
 function renderDefault(params) {
@@ -855,10 +1019,16 @@ var Router = React.createClass({
           <GameView id={parseInt(params[0])} store={gameStore} />
         </div>);
     },
-    "alpha-codes": function() {
+    "admin/user-list": function() {
       return (<div className="content content--wide">
           <TopBar pageName="Alpha codes" store={globalStore} />
-          <AdminView store={globalStore} />
+          <UserManagerView store={globalStore} />
+        </div>);
+    },
+    "admin/alpha-codes": function() {
+      return (<div className="content content--wide">
+          <TopBar pageName="Alpha codes" store={globalStore} />
+          <AlphaCodeManagerView store={globalStore} />
         </div>);
     },
     "/": renderDefault,
