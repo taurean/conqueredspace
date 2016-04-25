@@ -25,7 +25,7 @@ function smoothstep(a, b, t) {
   t = Math.max(a, t);
   t = Math.min(b, t);
   t = (t - a)/(b - a);
-  return 3*t*t*t - 2*t*t;
+  return 3*t*t - 2*t*t*t;
 }
 
 function mod(a, b) {

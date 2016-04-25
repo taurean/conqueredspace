@@ -5,8 +5,17 @@
 	<script type="text/javascript" src="build/math.js"></script>
 	<script type="text/javascript" src="build/utils.js"></script>
 
-	<script type="text/javascript" src="game-renderer.js">
-		
+	<script type="text/javascript" src="game-renderer.js"></script>
+	<script type="text/javascript">
+var _gameData = {"id":20,"turnCount":2,"turnOffset":0,"spatialMap":{"0":{"0":[{"player":0,"type":"MOTHERSHIP","pos":[0,0]}]},"1":{"0":[{"player":1,"type":"MOTHERSHIP","pos":[1,0]}]}},"pieces":[{"player":0,"type":"MOTHERSHIP","pos":[0,0]},{"player":1,"type":"MOTHERSHIP","pos":[1,0]}],"playersById":{"1":{"id":1,"username":"kaesve","order":1,"playing":true,"nest":{"CRAWLER":2,"HOPPER":3,"MOTHERSHIP":0,"SCOUT":3}},"2":{"id":2,"username":"Oakenos","order":0,"playing":true,"nest":{"CRAWLER":2,"HOPPER":3,"MOTHERSHIP":0,"SCOUT":3}}},"playersInOrder":[{"id":2,"username":"Oakenos","order":0,"playing":true,"nest":{"CRAWLER":2,"HOPPER":3,"MOTHERSHIP":0,"SCOUT":3}},{"id":1,"username":"kaesve","order":1,"playing":true,"nest":{"CRAWLER":2,"HOPPER":3,"MOTHERSHIP":0,"SCOUT":3}},{"id":2,"username":"Oakenos","order":0,"playing":true,"nest":{"CRAWLER":2,"HOPPER":3,"MOTHERSHIP":0,"SCOUT":3}},{"id":1,"username":"kaesve","order":1,"playing":true,"nest":{"CRAWLER":2,"HOPPER":3,"MOTHERSHIP":0,"SCOUT":3}}],"startShipCount":{"CRAWLER":2,"HOPPER":3,"MOTHERSHIP":1,"SCOUT":3},"selected":null,"lastMoveCreated":1459716260}
+
+function onLoad() {
+	var r = initGameRenderer(document.getElementById("game_rendersurface"));
+	startLoop(function(input) {
+		renderAndUpdateGame(r, input, _gameData, function() {});
+	});
+}
+
 	</script>
 
   <link rel="stylesheet" type="text/css" href="https://cloud.typography.com/6165274/7359352/css/fonts.css" />

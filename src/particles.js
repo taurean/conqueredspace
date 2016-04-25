@@ -160,7 +160,7 @@ function initParticles() {
       }
     }
 
-    hexagons(t, dt);
+    hexagons(input.t, input.dT);
   });
 
 

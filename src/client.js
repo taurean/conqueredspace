@@ -306,14 +306,6 @@ function rootReduxer(state, action) {
 
 /// NOTE(): checking the user id should not be neccesary, but I don't think it is harmful..
 function isSessionValid(session) { return session && session.userId !== null && getNow() < session.expiration; }
-function sessionFromToken(token) {
-  var tokenParts = /([^.]+).([^.]+).([^.]+)/.exec(token);
-  return {
-    tokenString: token,
-    header: JSON.parse(atob(tokenParts[1])),
-    data: JSON.parse(atob(tokenParts[2]))
-  };
-}
 function _logIn(store, token) {
   var session = sessionFromToken(token);
   store.dispatch({
@@ -469,11 +461,26 @@ var GameView = React.createClass({
   getInitialState: function() {
     return { counter: 0 };
   },
+  loopHandle: null,
+  toggleRendering: function(el) {
+    if (this.loopHandle) {
+      this.loopHandle();
+      this.loopHandle = noop;
+    }
+    if (el) {
+      var r = initGameRenderer(el);
+      this.loopHandle = startLoop(function(input) {
+        renderAndUpdateGame(r, input, gameStore.getState(), gameStore.dispatch);
+      });
+    }
+  },
   componentWillMount: function(){
     var self = this;
     function updateViewStore(appState, viewStore) {
       var id = self.props.id;
       var gameData = appState.games[id];
+      if (!gameData) return;
+
       var viewState = viewStore.getState();
       if (viewState.id != id || viewState.lastMoveCreated < peek(gameData.moves).created) {
         var playerCount = gameData.playersInOrder.length;
@@ -505,17 +512,15 @@ var GameView = React.createClass({
     this.updateCBHandle = globalStore.subscribe(function(state, dispatch, action) {
       updateViewStore(state, self.props.store);
     });
-    this.redrawHandle = gameStore.subscribe(function() {
-      self.setState({counter: self.state.counter + 1});
-    });
     updateViewStore(globalStore.getState(), self.props.store);
   },
   componentWillUnmount: function() {
     if (this.updateCBHandle) this.updateCBHandle();
+    if (this.redrawHandle) this.redrawHandle();
   },
   render: function() {
     return (<div>
-        <GameBoard {...this.props.store.getState()} />
+        <canvas ref={this.toggleRendering} />
       </div>);
   }
 });
@@ -849,14 +854,17 @@ var TopBar = React.createClass({
 
     return (<div className="c-topbar">
       <div className="primary">
-        <span className="o-page-name">{this.props.pageName}</span>
+        <div>
+          <span className="o-page-name">{this.props.pageName}</span>
+          { this.props.pageName != "Command center" ? [<br />, <RouteLink className="o-menu-item" path="/">Back to command center</RouteLink>] : null }
+        </div>
         <h1 className="heading">
           <canvas ref={updateLogoRenderTarget} className="logo-surface" width="100" height="100"></canvas>
           <span className="heading-text">Conquered Space</span>
         </h1>
         <p className="hi">
-          Hi {state.session.username || (<span pplassName="intruder">UNKNOWN INTRUDER</span>)}<br/>
-          <a className="logout" onClick={this.logout}>Log Out</a>
+          Hi {state.session.username || (<span className="intruder">UNKNOWN INTRUDER</span>)}<br/>
+          <a className="o-menu-item" onClick={this.logout}>Log Out</a>
         </p>
       </div>
       
@@ -1005,20 +1013,22 @@ window.onpopstate = function() {
 }
 
 function renderDefault(params) {
+  // return renderGameView([20]);
   return (<div className="content content--wide">
-      <TopBar pageName="Dashboard" store={globalStore} />
+      <TopBar pageName="Command center" store={globalStore} />
       <DashboardView />
+    </div>);
+}
+function renderGameView(params) {
+  return (<div className="content content--wide">
+      <TopBar pageName="Game" store={globalStore} />
+      <GameView id={parseInt(params[0])} store={gameStore} />
     </div>);
 }
 var Router = React.createClass({
   routeTrie: null,
   routes: {
-    "games/*": function(params) {
-      return (<div className="content content--wide">
-          <TopBar pageName="Game" store={globalStore} />
-          <GameView id={parseInt(params[0])} store={gameStore} />
-        </div>);
-    },
+    "games/*": renderGameView,
     "admin/user-list": function() {
       return (<div className="content content--wide">
           <TopBar pageName="Alpha codes" store={globalStore} />
@@ -1136,7 +1146,7 @@ var UserCreationForm = React.createClass({
           className="o-input"
           name="password" onChange={this.saveInputChange}
           type="password"
-          placeholder="s3cret"
+          placeholder="••••••••"
           required="required"/>
         {<ErrorList field="form" errors={errs['password']} />}
       </label>
@@ -1221,37 +1231,116 @@ var LoginForm = React.createClass({
   }
 });
 
+var RequestPasswordResetForm = React.createClass({
+  getInitialState: function() {
+    return {
+      emailOrUsername: this.props.username || this.props.email,
+      runState: "ready"
+    };
+  },
+  onChangeEmailOrUsername: function(event) { this.setState({ emailOrUsername: event.target.value }); },
+  onSubmit: function(event) {
+    var self = this;
+    event.preventDefault();
+
+    var payload = { emailOrUsername: this.state.emailOrUsername };
+    POST(BASE_URL + "passwordResets", payload, function(status, data) {
+        if (statusOK(status)) self.setState({ runState: "succeeded" });
+        else                  self.setState({ runState: "ready", error: data });
+      });
+    return false;
+  },
+  render: function() {
+    switch (this.state.runState) {
+      case "ready": {
+        var idPrefix = '';
+        if (this.props.id) {
+          idPrefix = this.props.id + '-';
+        }
+        var error = null;
+        var formClass = "loginForm";
+        if (this.props.error) {
+          var errorMessage = this.props.error.message;
+          if (this.props.error.code == 0) {
+            errorMessage = "Ruh roh. Could not reach server";
+          }
+          error = <p className="o-error error--login">{errorMessage}</p>
+          formClass += " form--is-error";
+        }
+        return (
+        <form className="log-in" onSubmit={this.onSubmit}>
+          {error}
+          <label className="label-input-pair" htmlFor={idPrefix + 'username-field'}>
+            <span className="o-label">Email or username</span>
+            <input onChange={this.onChangeEmailOrUsername}
+              id={idPrefix + 'username-or-email-field'}
+              className="o-input"
+              value={this.state.emailOrUsername}
+              placeholder="keen_commando33"
+              required="required"/>
+          </label>
+          <input type="submit" value="Reset password" className="o-btn" />
+        </form>);
+      } break;
+      case "loading": {
+        return <p>"..."</p>;
+      } break;
+      case "succeeded": {
+        return <p>A verification has been sent to you</p>
+      }
+    }
+    
+  }
+});
+
 var AuthorizationView = React.createClass({
   getInitialState: function() {
     return {
-      showLogin: true
+      show: "login"
     };
   },
   login: function(username, password, keep) { logIn(this.props.store, username, password, keep) },
-  logout: function() { logOut(this.props.store); },
   createUser: function() {},
   onSubmit: function() {},
 
   toggleShowLogin: function() { this.setState({ showLogin: ! this.state.showLogin}); },
 
   render: function() {
-    var toggleFormLabel, submitLabel, formItems;
-    if (this.state.showLogin) {
-      formItems = (<LoginForm onSubmit={this.login} error={this.props.store.getState().session.error}/>);
-      submitLabel = "Log In";
-      toggleFormLabel = "create an account instead";
-    } else {
-      formItems = (<UserCreationForm />);
-      submitLabel = "Sign Up";
-      toggleFormLabel = "log in instead";
+    var toggleFormLabel, submitLabel, view;
+    /// TODO: this should be in routing.
+    switch (this.state.show) {
+      case "login": {
+        view = [
+          (<LoginForm onSubmit={this.login} error={this.props.store.getState().session.error}/>),
+          (<a className="toggle-auth-form" onClick={() => this.setState({show: "new-user"})}>
+            create an account instead</a>),
+          <br />,
+          (<a className="toggle-auth-form" onClick={() => this.setState({show: "reset-password"})}>
+            forgot your password?</a>)
+        ];
+      } break;
+      case "new-user": {
+        view = [
+          (<UserCreationForm />),
+          (<a className="toggle-auth-form" onClick={() => this.setState({show: "login"})}>
+            or log in</a>)
+        ];
+      } break;
+      case "reset-password": {
+        view = [
+          (<RequestPasswordResetForm />),
+          (<a className="toggle-auth-form" onClick={() => this.setState({show: "login"})}>
+            or log in</a>)
+        ];
+      } break;
+      default: invalidCodePath();
     }
     return <section className="v-authorization content">
         <h1 className="heading">
           <canvas ref={updateLogoRenderTarget} className="logo-surface" width="100" height="100"></canvas>
           <span className="heading-text">Conquered Space</span>
         </h1>
-        { formItems }
-        <a className="toggle-auth-form" onClick={this.toggleShowLogin}>{toggleFormLabel}</a>
+        { view }
       </section>
   }
 });
@@ -1288,7 +1377,7 @@ var GameRequestForm = React.createClass({
             placeholder="username"
             required/>
         </label>
-        <input className="o-btn" type="submit" value="invite" />
+        <input className="o-btn" type="submit" value="challenge" />
         {error}
       </form>
   }

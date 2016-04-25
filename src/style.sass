@@ -92,26 +92,41 @@ ul, ol, li {
   }
 }
 .c-topbar:after {
-    content: '';
-    display: block;
-    clear: both;
+  content: '';
+  display: block;
+  clear: both;
 }
 
   .o-page-name {
     font-size: 2.5rem;
   }
   .hi {
-    margin: 0;
     text-align: right;
     font: 400 2.5rem/1.2 $font-stack-sans;
   }
-  .logout {
-    font-size: 0.8em;
-    color: gray;
-  }
 
+  .primary .o-menu-item {
+    &, &:visited {
+      color: gray;
+      transition: color 0.2s ease;
+    }
+  }
+  .secondary .o-menu-item {
+    &, &:visited {
+      color: white;
+      transition: color 0.2s ease;
+      margin-left: 1em;
+    }
+  }
   .o-menu-item {
-    margin-left: 1rem;
+    .primary &, .secondary & {
+      cursor: pointer;
+      text-decoration: none;
+      font-size: 2rem;
+      &:hover, &:active {
+        color: #7F0506;
+      }
+    }
   }
 
 .pollIndicator {
@@ -287,25 +302,31 @@ ul, ol, li {
 }
 
 .heading-text {
-    position: relative;
-    top: 0;
-    vertical-align: middle;
-    line-height: 100px;
-    transition: opacity .8s .2s ease, top .5s .2s ease, letter-spacing .5s .2s;
+  position: relative;
+  color: white;
+  text-decoration: none;
+  top: 0;
+  vertical-align: middle;
+  line-height: 100px;
+  transition: opacity .8s .2s ease, top .5s .2s ease, letter-spacing .5s .2s;
+
+  &:hover {
+    opacity: 0.5;
+  }
 }
 
 .loading .heading-text {
-    opacity: 0;
-    top: 5px;
-    letter-spacing: 10px;
+  opacity: 0;
+  top: 5px;
+  letter-spacing: 10px;
 }
 
 .logo-surface {
-    position: absolute;
-    left: 0;
-    right: 0;
-    margin: 0 auto;
-    height: 100%;
+  position: absolute;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  height: 100%;
 }
 
 .content {
@@ -336,21 +357,21 @@ p {
 #pageBody { position: relative; }
 
 .notification-list {
-    list-style: none;
-    float: left;
-    position: relative;
+  list-style: none;
+  float: left;
+  position: relative;
 }
 
 .notification-list li:before {
-    content: '>';
-    font: 600 small monospace;
-    margin-right: 0.35rem;
-    display: inline;
-    color: blue;
+  content: '>';
+  font: 600 small monospace;
+  margin-right: 0.35rem;
+  display: inline;
+  color: blue;
 }
 .notification {
-    display: inline-block;
-    height: 1.5rem;
+  display: inline-block;
+  height: 1.5rem;
 }
 
 .alpha-codes {
@@ -367,11 +388,11 @@ p {
 }
 
 .game-link {
-    padding: 0 0.2rem;
-    position: relative;
+  padding: 0 0.2rem;
+  position: relative;
 }
 .game-link:hover {
-    transform:scale(1.1);
+  transform:scale(1.1);
 }
 
 
@@ -383,45 +404,45 @@ p {
  *               GAME STYLES               *
  *                                         */
 
-  .nest[data-player="0"] .piece_poly--inner, 
-  .piece[data-player="0"] .piece_poly--inner { fill: white; }
-  .nest[data-player="1"] .piece_poly--inner, 
-  .piece[data-player="1"] .piece_poly--inner { fill: black; }
-  .nest--activePlayer {
-    stroke: pink;
-  }
-  .nest-player {
-    fill: white;
-  }
+.nest[data-player="0"] .piece_poly--inner, 
+.piece[data-player="0"] .piece_poly--inner { fill: white; }
+.nest[data-player="1"] .piece_poly--inner, 
+.piece[data-player="1"] .piece_poly--inner { fill: black; }
+.nest--activePlayer {
+  stroke: pink;
+}
+.nest-player {
+  fill: white;
+}
 
-  .nest-background { fill: transparent; stroke: transparent; }
-  .nest--activePlayer .nest-background { fill: transparent; stroke: red; }
+.nest-background { fill: transparent; stroke: transparent; }
+.nest--activePlayer .nest-background { fill: transparent; stroke: red; }
 
-  .piece[data-type=MOTHERSHIP] .piece_poly--outer { fill: gold; }
-  .piece[data-type=HOPPER]     .piece_poly--outer { fill: limegreen; }
-  .piece[data-type=SPIDER]     .piece_poly--outer { fill: peru; }
-  .piece[data-type=SCOUT]      .piece_poly--outer { fill: royalblue; }
-  .piece[data-type=CRAWLER]    .piece_poly--outer { fill: purple; }
-  .piece[data-type=SHIFTER]    .piece_poly--outer { fill: grey; }
+.piece[data-type=MOTHERSHIP] .piece_poly--outer { fill: gold; }
+.piece[data-type=HOPPER]     .piece_poly--outer { fill: limegreen; }
+.piece[data-type=SPIDER]     .piece_poly--outer { fill: peru; }
+.piece[data-type=SCOUT]      .piece_poly--outer { fill: royalblue; }
+.piece[data-type=CRAWLER]    .piece_poly--outer { fill: purple; }
+.piece[data-type=SHIFTER]    .piece_poly--outer { fill: grey; }
 
-  /* these need to be renamed */
-  .piece[data-type=pillbug]     .piece_poly--outer { fill: lightgray; }
-  .piece[data-type=ladybug]     .piece_poly--outer { fill: red; }
+/* these need to be renamed */
+.piece[data-type=pillbug]     .piece_poly--outer { fill: lightgray; }
+.piece[data-type=ladybug]     .piece_poly--outer { fill: red; }
 
-  .moveSlot .piece_poly--outer,
-  .putSlot .piece_poly--outer {
-    fill: none;
-    stroke: gray;
-  }
-  .moveSlot text,
-  .putSlot text {
-    fill: gray;
-    text-anchor: middle;
-    dominant-baseline: central;
-  }
-  .moveSlot text:hover,
-  .putSlot text:hover {
-    fill: blue;
-    cursor: pointer;
-    transform: scale(1.2);
-  }
+.moveSlot .piece_poly--outer,
+.putSlot .piece_poly--outer {
+  fill: none;
+  stroke: gray;
+}
+.moveSlot text,
+.putSlot text {
+  fill: gray;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.moveSlot text:hover,
+.putSlot text:hover {
+  fill: blue;
+  cursor: pointer;
+  transform: scale(1.2);
+}

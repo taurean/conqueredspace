@@ -65,19 +65,29 @@ function statusOK(status) { return status && 200 <= status && status < 300; }
 function startLoop(simFn) {
   var handle;
 
-  /// TODO: add scroll x, y, viewport size, viewportIsDirty
-
+  var viewportDim = [0, 0];
+  var viewportDirty = true;
+  function markViewportDirty() { viewportDirty = true; }
+  window.addEventListener("resize", markViewportDirty);
   
-
+  var doc = document.documentElement;
+  var scrollAt;
+  var prevScrollAt = [0, 0];
+  var scrollDirty = true;
+  function markScrollDirty() { scrollDirty = true; }
+  window.addEventListener("scroll", markScrollDirty);
 
   var mAt = [0, 0];
   var prevMAt = [0, 0];
-  window.addEventListener("mousemove", function updateMAt(e) { mAt = [e.clientX, e.clientY]; });
+  function updateMAt(e) { mAt = [e.clientX, e.clientY]; }
+  window.addEventListener("mousemove", updateMAt);
 
   var mDowns = [];
   var mUps = [];
-  window.addEventListener("mousedown", function registerMDown(e) { mDowns.push([e.clientX, e.clientY]); });
-  window.addEventListener("mouseup", function registerMUp(e) { mUps.push([e.clientX, e.clientY]); });
+  function registerMDown(e) { mDowns.push([e.clientX, e.clientY]); }
+  function registerMUp(e) { mUps.push([e.clientX, e.clientY]); }
+  window.addEventListener("mousedown", registerMDown);
+  window.addEventListener("mouseup", registerMUp);
 
 
   var orientation = [0, 0, 0];
@@ -85,18 +95,15 @@ function startLoop(simFn) {
   var orientationAnchor = [0, 0, 0];
   var orientationMeasured = false;
   function updateOrientation(e) { orientation = [e.alpha, e.beta, e.gamma]; }
-  window.addEventListener('deviceorientation', function initOrientation(e) {
+  function initOrientation(e) {
     if (e.gamma !== null) {
       orientationMeasured = true;
-      if (!e.absolute) {
-        orientationAnchor = [e.alpha, e.beta, e.gamma];
-      }
+      if (!e.absolute) { orientationAnchor = [e.alpha, e.beta, e.gamma]; }
       window.removeEventListener('deviceorientation', initOrientation);
       window.addEventListener('deviceorientation', updateOrientation);
     }
-  });
-
-
+  }
+  window.addEventListener('deviceorientation', initOrientation);
 
   var prevT;
   function initTimeAndLoop(t){
@@ -105,15 +112,29 @@ function startLoop(simFn) {
   }
   function loop(t) {
 
+    if (scrollDirty) {
+      scrollAt = [(window.pageXOffset || doc.scrollLeft) - (doc.clientLeft || 0),
+        (window.pageYOffset || doc.scrollTop)  - (doc.clientTop || 0)];
+    }
+
+    if (viewportDirty) {
+      viewportDim = [document.body.clientWidth, document.body.clientHeight];
+    }
+
     var input = {
       orientation: orientation,
       dOrientation: negV3(orientation, prevOrientation),
 
       mAt: mAt,
       dMAt: negV2(mAt, prevMAt),
-
+      scrollDirty: scrollDirty,
+      scrollAt: scrollAt,
+      dScrollAt: negV2(scrollAt, prevScrollAt),
       mDowns: mDowns,
       mUpts: mUps,
+
+      viewportDim: viewportDim,
+      viewportDirty: viewportDirty,
 
       t: t,
       dT: t - prevT,
@@ -121,9 +142,12 @@ function startLoop(simFn) {
 
     prevT = t;
     prevMAt = mAt;
+    scrollDirty = false;
+    prevScrollAt = scrollAt;
     mDowns = [];
     mUps = [];
     prevOrientation = orientation;
+    viewportDirty = false;
 
     handle = window.requestAnimationFrame(loop);
     simFn(input);
@@ -133,7 +157,11 @@ function startLoop(simFn) {
   return function() {
     window.cancelAnimationFrame(handle);
     window.removeEventListener("mousemove", updateMAt);
+    window.removeEventListener("mouseup", registerMUp);
+    window.removeEventListener("mousedown", registerMDown);
+    window.removeEventListener("scroll", markScrollDirty);
     window.removeEventListener("deviceorientation", updateOrientation);
+    window.removeEventListener("resize", markViewportDirty);
   }
 }
 
@@ -168,3 +196,12 @@ function format(f) {
 function peek(arr) { return arr[arr.length - 1]; }
 
 function getNow() { return Date.now()/1000; }
+
+function sessionFromToken(token) {
+  var tokenParts = /([^.]+).([^.]+).([^.]+)/.exec(token);
+  return {
+    tokenString: token,
+    header: JSON.parse(atob(tokenParts[1])),
+    data: JSON.parse(atob(tokenParts[2]))
+  };
+}
