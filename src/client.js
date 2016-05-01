@@ -1554,6 +1554,7 @@ var GameListing = React.createClass({
               } break;
               case MOVES.PLAY_MOTHERSHIP:
               case MOVES.PLAY_SCOUT:
+              case MOVES.PLAY_HOPPER:
               case MOVES.PLAY_SHIFTER: {
                 var shipType = shipFromMove(move.type);
                 var label = shipLabels[shipType];

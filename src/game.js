@@ -422,7 +422,17 @@ function slotInteraction(at, sel) {
       storing the board failed, we just reload the latest known state.
       */
       var payload;
-      if (sel.on == 'board') {
+      if (sel.pos == 'nest') {
+        payload = {
+          type: createPutType(sel.shipType),
+          to: at,
+        }
+        dispatch({
+          type: GAME_ACTIONS.PUT,
+          to: at,
+          shipType: sel.shipType
+        });
+      } else if (sel.pos) {
         payload = {
           type: MOVES.MOVE,
           from: sel.pos,
@@ -433,17 +443,7 @@ function slotInteraction(at, sel) {
           from: sel.pos,
           to: at
         });
-      } else if (sel.pos == 'nest') {
-        payload = {
-          type: createPutType(sel.shipType),
-          to: at,
-        }
-        dispatch({
-          type: GAME_ACTIONS.PUT,
-          to: at,
-          shipType: sel.shipType
-        });
-      } else { invalidCodePath(); }
+      } else { invalidCodePath(); return; }
 
       POST(urls.gameMoves(gameId), payload, function(status, data) {
         if (statusOK(status)) {
