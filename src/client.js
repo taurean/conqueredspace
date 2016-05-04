@@ -1355,29 +1355,107 @@ var UserSummary = React.createClass({
 
 var GameRequestForm = React.createClass({
   mixins: [SaveFormMixin],
-  getInitialState: function() { return {}; },
+  blur: function(e) {
+    if (this.state.displaySuggestions) {
+      console.info("disabling suggestions");
+      this.setState({ displaySuggestions: false });
+    }
+  },
+  componentWillMount: function() {
+    this.blur = this.blur.bind(this);
+    window.addEventListener("click", this.blur);
+  },
+  componentWillUnmount: function() {
+    window.removeEventListener("click", this.blur);
+  },
+  getInitialState: function() {
+    return {
+      opponentName: "",
+      suggestions: [],
+      suggestionFocus: 0,
+      displaySuggestions: false,
+    };
+  },
+  loadSuggestions: (function() {
+    var timeoutHandle = null;
+    var loadSuggestions = function() {
+      console.info("load", this.state.opponentName);
+      var self = this;
+      GET(BASE_URL + "users", { "username-like": this.state.opponentName }, function(status, payload) {
+        console.info('loaded', status, payload);
+        if (statusOK(status)) {
+          self.setState({ suggestions: JSON.parse(payload) });
+        }
+      });
+    };
+    return function() {
+      if (timeoutHandle) { window.clearTimeout(timeoutHandle); }
+      console.info("preparing to load", this);
+      timeoutHandle = window.setTimeout(loadSuggestions.bind(this), 100);
+    }
+  })(),
+  eatEvent: function(e) {
+    e.stopPropagation();
+  },
+  handleFocus: function() {
+    this.loadSuggestions();
+    this.setState({ displaySuggestions: true });
+  },
   handleSubmit: function(event) {
     event.preventDefault();
-    console.log(this.state, this.props);
+    console.info(this.state, this.props);
     this.props.onSubmit(this.state.opponentName);
     return false;
+  },
+  handleSelectSuggestion: function(e) {
+    e.stopPropagation();
+    console.info(e.target);
+    this.setState({opponentName: e.target.innerText, displaySuggestions: false });
+  },
+  handleChange: function(e) {
+    this.saveInputChange(e);
+    this.loadSuggestions();
   },
   render: function() {
     var error = null;
     if (this.props.error) {
       error = <p className="field-error">{this.props.error.message}</p>;
     }
-    return <form onSubmit={this.handleSubmit}>
-        <label className="label-input-pair">
-          <span className="o-label">Opponent</span>
-          <input name="opponentName"
-            className="o-input"
-            onChange={this.saveInputChange}
-            value={this.state.opponentName}
-            placeholder="username"
-            required/>
-        </label>
-        <input className="o-btn" type="submit" value="challenge" />
+    var suggestions = null;
+    if (this.state.displaySuggestions) {
+      if (this.state.suggestions.length > 0) {
+        var suggestionItems = Array(this.state.suggestions.length);
+        for(var i = 0; i < suggestionItems.length; ++i) {
+          var sug = this.state.suggestions[i];
+          suggestionItems[i] = <li className="suggestion">{sug.username}</li>;
+        }
+        suggestions = (<ul className="usernameSuggestions" onClick={this.handleSelectSuggestion}>
+            {suggestionItems}
+          </ul>);
+      } else if (this.state.opponentName) {
+        suggestions = <span className="usernameSuggestions">No user found with that name</span>;
+      } else {
+        suggestions = <span className="usernameSuggestions">Start typing for user suggestions</span>;
+      }
+    }
+    return <form className="gameRequestForm" onSubmit={this.handleSubmit}>
+        <div className="input-button-group">
+          <label className="label-input-pair">
+            <span className="o-label">Opponent</span>
+            <input name="opponentName"
+              className="o-input"
+              onFocus={this.handleFocus}
+              // onClick={this.loadSuggestions}
+              onChange={this.handleChange}
+              // onBlur={this.blur}
+              onClick={this.eatEvent}
+              value={this.state.opponentName}
+              placeholder="username"
+              required/>
+          </label>
+          <input className="o-btn" type="submit" value="challenge" />
+        </div>
+        {suggestions}
         {error}
       </form>
   }

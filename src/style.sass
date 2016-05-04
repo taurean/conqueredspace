@@ -180,12 +180,26 @@ ul, ol, li {
   margin-left: .6rem;
   text-transform: lowercase;
 }
-.label-input-pair {
+.label-input-pair,
+.input-button-group {
   display: block;
   margin-bottom: 2rem;
 }
+.input-button-group {
+  display: flex;
+  align-items: flex-end;
+
+  & > .label-input-pair {
+    flex-grow: 1;
+    margin-bottom: 0;
+  }
+  & > .o-btn {
+    width: auto;
+    padding: 1.2rem 2.5rem;
+  }
+}
   .o-input {
-    background: rgba(0, 0, 0, 0.75);
+    background: rgba(0, 0, 0, 0.7);
     border: .1rem solid rgba(255, 255, 255, 0.5);
     border-radius: .2rem;
     color: white;
@@ -193,7 +207,7 @@ ul, ol, li {
     font-size: 1.8rem;
     padding: 1.2rem;
     margin-top: .6rem;
-    transition: border-color .125s ease, color .125s ease;
+    transition: border-color .125s ease, color .125s ease, background .125s ease;
     width: 100%;
     
     &:placeholder-shown {
@@ -211,9 +225,11 @@ ul, ol, li {
       border-color: white;
       color: white;
       outline: none;
+      background: rgba(0, 0, 0, 0.9);
     }
     
     &:hover {
+      background: rgba(0, 0, 0, 0.8);
       border-color: rgba(255, 255, 255, 0.8);
     }
     
@@ -229,14 +245,13 @@ ul, ol, li {
     }
   }
 
-
 .o-btn {
   background: rgba(white, 0.3);
   color: white;
   cursor: pointer;
   display: block;
   width: 100%;
-  padding: 1rem;
+  padding: 1.2rem;
   border: 1px solid white;
   border-radius: .2rem;
   font-size: 1.8rem;
@@ -395,6 +410,32 @@ p {
   transform:scale(1.1);
 }
 
+.gameRequestForm {
+  position: relative;
+}
+
+.usernameSuggestions {
+  position: absolute;
+  top: 100%;
+  background: rgba(0, 0, 0, .95);
+  width: 100%;
+  border-radius: .2rem;
+  border: .1rem solid rgba(255, 255, 255, 0.5);
+  border-top: none;
+  padding: 1rem;
+  border-collapse: collapse;
+  font-size: 1.8rem;
+  color: rgba(255, 255, 255, 0.3);
+}
+  .suggestion {
+    border-top: 0.1rem solid rgba(255, 0, 0, 0.15);
+    cursor: pointer;
+    transition: color .125s ease;
+  }
+
+  .suggestion--focus, .suggestion:hover, .suggestion:focus {
+    color: white;
+  }
 
 .v-authorization {
   margin-top: 15rem;
