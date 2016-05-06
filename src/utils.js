@@ -7,8 +7,9 @@
 /// TOOD: move this section to a separate file, that can easily be switched out in different environments, to turn off stuff.
 if (!console.err) { console.err = console.log; }
 
-function assert(a, s) { if (!a) { alert("assert fired! " + s); debugger; } }
+function assert(a, s) { if (!a) { alert("assert fired! \n" + s); debugger; } }
 function invalidCodePath() { alert("invalid code path reached"); debugger; }
+function notImplemented() { alert("called a function that is not implemented yet"); debugger; }
 
 
 ///
@@ -170,6 +171,8 @@ function startLoop(simFn) {
 /// Misc
 ///
 
+function eatEvent(e) { e.stopPropagation(); return false; }
+
 function mapOver(src, mapping) {
   var target = [];
   for (var key in src) {
@@ -182,6 +185,22 @@ function assign(/*...objects*/){
   var r = arguments[0];
   for (var i = 1; i < arguments.length; ++i) {
     for (var key in arguments[i]) r[key] = arguments[i][key];
+  }
+  return r;
+}
+function pluck(from/*, ...fieldNames*/) {
+  var r = {};
+  for (var i = 1; i < arguments.length; ++i) r[arguments[i]] = from[arguments[i]];
+  return r;
+}
+function withoutFields(obj/*, ...fieldNames*/) {
+  var r = assign({}, obj);
+  for (var i = 1; i < arguments.length; ++i) {
+    var f = arguments[i];
+    if (arguments[i] in r) {
+      var v = obj[f];
+      delete r[f];
+    }
   }
   return r;
 }

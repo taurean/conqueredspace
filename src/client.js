@@ -561,9 +561,10 @@ var DashboardView = React.createClass({
             <h3>Incoming game requests</h3>
             <ol className="notification-list">
               {mapOver(state.notifications, function(n) {
-                if (!n.read) {
-                  return (<li key={n.id}><Notification {...n} /></li>);
-                }
+                var renderableNotification = !n.read && (n.notificationType.name == NOTIFICATIONS.GAME_REQUEST_ACCEPTED ||
+                  n.notificationType.name == NOTIFICATIONS.GAME_REQUEST_RECEIVED ||
+                  n.notificationType.name == NOTIFICATIONS.GAME_REQUEST_REJECTED);
+                return renderableNotification ? (<li key={n.id}><Notification {...n} /></li>) : null;
               })}
             </ol>
           </section>
@@ -1079,20 +1080,42 @@ var SaveFormMixin = {
     this.setState(inputData);
   }
 };
-
-
 var ErrorList = React.createClass({
   render: function() {
     if (this.props.errors) {
-      var className = "errors errors-" + this.props.field;
+      var className = "errors errors_" + this.props.field;
       return (<ul className={className}>
           {this.props.errors.map(e => <li className="error">{e}</li>)}
         </ul>)
-    } else {
-      return null;
     }
+
+    return null;
   }
 });
+
+
+var LabelInputPair = React.createClass({
+  render: function() {
+    var idPrefix = this.props.id ? this.props.id + '_' : '';
+    var id = idPrefix + 'field-' + name;
+    var name = this.props.name;
+
+    /// Note: This works when "false" is passed
+    var inputProps = withoutFields(this.props, "errors", "label");
+    inputProps.id = id;
+    inputProps.className = (inputProps.className || "") + " o-input";
+    var required = "required" in this.props && this.props.required;
+
+    return (<label className="label-input-pair" htmlFor={id}>
+        <span className="o-label">{this.props.label}</span>
+        <input {...inputProps}/>
+        {<ErrorList field={name} errors={this.props.errors} />}
+      </label>);
+  }
+});
+
+
+
 var UserCreationForm = React.createClass({
   mixins: [SaveFormMixin],
   getInitialState: function() {return { errors: {} }; },
@@ -1118,62 +1141,33 @@ var UserCreationForm = React.createClass({
     return false;
   },
   render: function() {
-    var idPrefix = '';
-    if (this.props.id) {
-      idPrefix = this.props.id + '-';
-    }
+    
     var errs = this.state.errors;
-    if (! 'form' in errs) errs['form'] = null;
-    if (! 'email' in errs) errs['email'] = null;
+    if (! 'form'     in errs) errs['form']     = null;
+    if (! 'email'    in errs) errs['email']    = null;
     if (! 'username' in errs) errs['username'] = null;
     if (! 'password' in errs) errs['password'] = null;
 
     return <form className="newUserForm" onSubmit={this.handleSubmit}>
       {<ErrorList field="form" errors={errs['form']} />}
-      <label className="label-input-pair" htmlFor={idPrefix + 'usernam-field'}>
-        <span className="o-label">Username</span>
-        <input id={idPrefix + 'username-field'}
-          className="o-input"
-          name="username"
-          onChange={this.saveInputChange}
-          placeholder="keen_commando33"
-          required="required"/>
-        {<ErrorList field="form" errors={errs['username']} />}
-      </label>
-      <label className="label-input-pair" htmlFor={idPrefix + 'password-field'}>
-        <span className="o-label">Password</span>
-        <input id={idPrefix + 'password-field'}
-          className="o-input"
-          name="password" onChange={this.saveInputChange}
-          type="password"
-          placeholder="••••••••"
-          required="required"/>
-        {<ErrorList field="form" errors={errs['password']} />}
-      </label>
-      <label className="label-input-pair" htmlFor={idPrefix + 'email-field'}>
-        <span className="o-label">Email</span>
-        <input id={idPrefix + 'email-field'}
-          className="o-input"
-          name="email"
-          onChange={this.saveInputChange}
-          type="email"
-          placeholder="keen33@space-federation.com"
-          required="required"/>
-        {<ErrorList field="form" errors={errs['email']} />}
-      </label>
-      <label className="label-input-pair" htmlFor={idPrefix + 'alpha-code'}>
-        <span className="o-label">Access Code</span>
-        <input id={idPrefix + 'alpha-code'}
-          className="o-input"
-          name="alpha_code"
-          onChange={this.saveInputChange}
-          type="text"
-          maxLength="8"
-          minLength="8"
-          placeholder="koead23n$"
-          required="required"/>
-        {<ErrorList field="form" errors={errs['alpha_code']} />}
-      </label>
+      
+      <LabelInputPair name="username" label="Username" idPrefix={this.props.id}
+        placeholder="capitan_99" errors={errs['username']}
+        onChange={this.saveInputChange} required="required" />
+      
+      <LabelInputPair name="password" label="Password" idPrefix={this.props.id}
+        placeholder="••••••••" type="password" errors={errs['password']}
+        onChange={this.saveInputChange}  required="required" />
+
+      <LabelInputPair name="email" label="Email" idPrefix={this.props.id}
+        placeholder="capitan_99@space-federation.com" type="email" errors={errs['email']}
+        onChange={this.saveInputChange} errequired="required" />
+      
+      <LabelInputPair name="alpha_code" label="Access code" idPrefix={this.props.id}
+        placeholder=".... ...." type="email" errors={errs['alpha-code']} 
+        maxLength="8" minLength="8"
+        onChange={this.saveInputChange} equired="required" />
+      
       <input type="submit" className="o-btn" value="Sign Up" />
     </form>
   }
@@ -1185,8 +1179,7 @@ var LoginForm = React.createClass({
   onChangeUsername: function(event) { this.setState({ username: event.target.value }); },
   onSubmit: function(event) {
     event.preventDefault();
-    console.log(this.state);
-    this.props.onSubmit(this.state.username, this.state.password, this.state.stayLoggedIn);
+    logIn(globalStore, this.state.username, this.state.password, this.state.stayLoggedIn);
     return false;
   },
   render: function () {
@@ -1207,25 +1200,10 @@ var LoginForm = React.createClass({
     return (
     <form className="log-in" onSubmit={this.onSubmit}>
       {error}
-      <label className="label-input-pair" htmlFor={idPrefix + 'username-field'}>
-        <span className="o-label">Username</span>
-        <input onChange={this.onChangeUsername}
-          id={idPrefix + 'username-field'}
-          className="o-input"
-          value={this.state.username}
-          placeholder="keen_commando33"
-          required="required"/>
-      </label>
-      <label className="label-input-pair" htmlFor={idPrefix + 'password-field'}>
-        <span className="o-label">Password</span>
-        <input onChange={this.onChangePassword}
-          id={idPrefix + 'password-field'}
-          className="o-input"
-          type="password"
-          value={this.state.password}
-          placeholder="••••••••"
-          required="required"/>
-      </label>
+      <LabelInputPair name="username" label="Username" value={this.state.username} placeholder="keen_commando33"
+        onChange={this.onChangeUsername} required="required" />
+      <LabelInputPair name="password" value={this.state.password} placeholder="••••••••"
+          type="password" onChange={this.onChangePassword} required="required" />
       <input type="submit" value="Log In" className="o-btn" />
     </form>);
   }
@@ -1270,15 +1248,8 @@ var RequestPasswordResetForm = React.createClass({
         return (
         <form className="log-in" onSubmit={this.onSubmit}>
           {error}
-          <label className="label-input-pair" htmlFor={idPrefix + 'username-field'}>
-            <span className="o-label">Email or username</span>
-            <input onChange={this.onChangeEmailOrUsername}
-              id={idPrefix + 'username-or-email-field'}
-              className="o-input"
-              value={this.state.emailOrUsername}
-              placeholder="keen_commando33"
-              required="required"/>
-          </label>
+          <LabelInputPair label="Email or username" name="username-or-email-field" value={this.state.emailOrUsername} 
+            placeholder="keen_commando33" onChange={this.onChangeEmailOrUsername} required="required"/>
           <input type="submit" value="Reset password" className="o-btn" />
         </form>);
       } break;
@@ -1294,24 +1265,14 @@ var RequestPasswordResetForm = React.createClass({
 });
 
 var AuthorizationView = React.createClass({
-  getInitialState: function() {
-    return {
-      show: "login"
-    };
-  },
-  login: function(username, password, keep) { logIn(this.props.store, username, password, keep) },
-  createUser: function() {},
-  onSubmit: function() {},
-
-  toggleShowLogin: function() { this.setState({ showLogin: ! this.state.showLogin}); },
-
+  getInitialState: function() { return { show: "login" }; },
   render: function() {
     var toggleFormLabel, submitLabel, view;
     /// TODO: this should be in routing.
     switch (this.state.show) {
       case "login": {
         view = [
-          (<LoginForm onSubmit={this.login} error={this.props.store.getState().session.error}/>),
+          (<LoginForm error={this.props.store.getState().session.error}/>),
           (<a className="toggle-auth-form" onClick={() => this.setState({show: "new-user"})}>
             create an account instead</a>),
           <br />,
@@ -1345,29 +1306,8 @@ var AuthorizationView = React.createClass({
   }
 });
 
-var UserSummary = React.createClass({
-  render: function() {
-    return <p>
-        Hello {this.props.username || "<<UNKNOWN INTRUDER>>"}!
-      </p>
-  }
-});
-
 var GameRequestForm = React.createClass({
   mixins: [SaveFormMixin],
-  blur: function(e) {
-    if (this.state.displaySuggestions) {
-      console.info("disabling suggestions");
-      this.setState({ displaySuggestions: false });
-    }
-  },
-  componentWillMount: function() {
-    this.blur = this.blur.bind(this);
-    window.addEventListener("click", this.blur);
-  },
-  componentWillUnmount: function() {
-    window.removeEventListener("click", this.blur);
-  },
   getInitialState: function() {
     return {
       opponentName: "",
@@ -1375,6 +1315,15 @@ var GameRequestForm = React.createClass({
       suggestionFocus: 0,
       displaySuggestions: false,
     };
+  },
+  hideSuggestions: function(e) {
+    if (this.state.displaySuggestions) { this.setState({ displaySuggestions: false }); }
+  },
+  componentWillMount: function() {
+    window.addEventListener("click", this.hideSuggestions);
+  },
+  componentWillUnmount: function() {
+    window.removeEventListener("click", this.hideSuggestions);
   },
   loadSuggestions: (function() {
     var timeoutHandle = null;
@@ -1394,22 +1343,17 @@ var GameRequestForm = React.createClass({
       timeoutHandle = window.setTimeout(loadSuggestions.bind(this), 100);
     }
   })(),
-  eatEvent: function(e) {
-    e.stopPropagation();
-  },
   handleFocus: function() {
     this.loadSuggestions();
     this.setState({ displaySuggestions: true });
   },
   handleSubmit: function(event) {
     event.preventDefault();
-    console.info(this.state, this.props);
     this.props.onSubmit(this.state.opponentName);
     return false;
   },
   handleSelectSuggestion: function(e) {
     e.stopPropagation();
-    console.info(e.target);
     this.setState({opponentName: e.target.innerText, displaySuggestions: false });
   },
   handleChange: function(e) {
@@ -1417,10 +1361,8 @@ var GameRequestForm = React.createClass({
     this.loadSuggestions();
   },
   render: function() {
-    var error = null;
-    if (this.props.error) {
-      error = <p className="field-error">{this.props.error.message}</p>;
-    }
+    var error = this.props.error ? <p className="field-error">{this.props.error.message}</p> : null;
+
     var suggestions = null;
     if (this.state.displaySuggestions) {
       if (this.state.suggestions.length > 0) {
@@ -1440,19 +1382,12 @@ var GameRequestForm = React.createClass({
     }
     return <form className="gameRequestForm" onSubmit={this.handleSubmit}>
         <div className="input-button-group">
-          <label className="label-input-pair">
-            <span className="o-label">Opponent</span>
-            <input name="opponentName"
-              className="o-input"
-              onFocus={this.handleFocus}
-              // onClick={this.loadSuggestions}
+          <LabelInputPair name="opponent" label="Opponent" onFocus={this.handleFocus}
               onChange={this.handleChange}
-              // onBlur={this.blur}
-              onClick={this.eatEvent}
+              onClick={eatEvent}
               value={this.state.opponentName}
-              placeholder="username"
-              required/>
-          </label>
+              placeholder="........"
+              required />
           <input className="o-btn" type="submit" value="challenge" />
         </div>
         {suggestions}
@@ -1509,27 +1444,20 @@ var Notification = React.createClass({
         }
       });
   },
-  acceptGameRequest: function() {
-    this.__acceptOrRejectRequest(true);
-  },
-  rejectGameRequest: function() {
-    this.__acceptOrRejectRequest(false);
-  },
-
+  acceptGameRequest: function() { this.__acceptOrRejectRequest(true); },
+  rejectGameRequest: function() { this.__acceptOrRejectRequest(false); },
 
   markNotificationRead: function() {
     var id = this.props.id;
     globalStore.dispatch({ type: ACTIONS.MARK_READ, id: id });
 
     var state = globalStore.getState();
-
     PUT(urls.notificationRead(id), authPayload(state),
       function(status, data) {
         if (! statusOK(status)) {
           globalStore.dispatch({
             type: ACTIONS.MARKING_NOTIFICATION_FAILED,
-            id: id,
-            error: data
+            id: id, error: data
           });
         }
       });
@@ -1546,42 +1474,42 @@ var Notification = React.createClass({
       return name;
     }
 
-    var content;
+    var content = null;
     var type = props.notificationType.name;
     var classes = format("notification notification--$1 notification--$2",
       type, props.read ? "read" : "unread");
 
     var messageFormat = notificationMessages[props.notificationType.version][type];
     var message;
+    var markReadButton = (<button className="o-btn o-btn--inline" onClick={this.markNotificationRead}>Mark read</button>);
     switch (type) {
       case 'GAME_REQUEST_RECEIVED': {
         content = (<div className={classes}>
             {format(messageFormat, idToUsername(state, props.parameters[1]))}
-            <button onClick={this.acceptGameRequest}>Accept</button>
-            <button onClick={this.rejectGameRequest}>Reject</button>
+            <button className="o-btn o-btn--inline" onClick={this.acceptGameRequest}>Accept</button>
+            <button className="o-btn o-btn--inline" onClick={this.rejectGameRequest}>Reject</button>
           </div>);
+      } break;
+      case 'GAME_REQUEST_REJECTED': {
+        message = format(messageFormat, idToUsername(state, props.parameters[1]))
+        content = (<div className={classes}>{message} {markReadButton}</div>);
       } break;
 
       case 'GAME_REQUEST_ACCEPTED':
       case 'OPPONENT_MOVED_PIECE':
       case 'OPPONENT_PLAYED_PIECE':
-      case 'OPPONENT_RESIGNED': {
-        var gamePath = 'games/' + props.parameters[0];
+      case 'OPPONENT_RESIGNED': { } break; 
+      // {
+      //   var gamePath = 'games/' + props.parameters[0];
 
-        var formatArguments = [messageFormat].concat(props.parameters);
-        formatArguments[2] = idToUsername(state, props.parameters[1]);
-        message = format.apply(null, formatArguments);
+      //   var formatArguments = [messageFormat].concat(props.parameters);
+      //   formatArguments[2] = idToUsername(state, props.parameters[1]);
+      //   message = format.apply(null, formatArguments);
 
-        content = (<div className={classes}>
-            {message} <RouteLink className="game-link" path={gamePath}>Go to game</RouteLink>
-            <button onClick={this.markNotificationRead}>mark read</button>
-          </div>);
-      } break;
-
-      case 'GAME_REQUEST_REJECTED': {
-        message = format(messageFormat, idToUsername(state, props.parameters[1]))
-        content = (<div className={classes}>{message} <button onClick={this.markNotificationRead}>done</button></div>)
-      } break;
+      //   content = (<div className={classes}>
+      //       {message} <RouteLink className="game-link" path={gamePath}>Go to game</RouteLink> {markReadButton}
+      //     </div>);
+      // } break;
 
       default:
         invalidCodePath();
@@ -1591,12 +1519,6 @@ var Notification = React.createClass({
   },
 });
 
-var GameRow = React.createClass({
-  render: function() {
-    var game = this.props.game;
-    
-  }
-});
 var GameListing = React.createClass({
   render: function() {
     var games = this.props.games;
@@ -1627,8 +1549,7 @@ var GameListing = React.createClass({
               } break;
               case MOVES.MOVE: {
                 moveText = "$1 moved a piece from ($2) to ($3)";
-                moveText = format(moveText, username,
-                  move.from.join(', '), move.to.join(', '));
+                moveText = format(moveText, username, move.from.join(', '), move.to.join(', '));
               } break;
               case MOVES.PLAY_MOTHERSHIP:
               case MOVES.PLAY_SCOUT:
@@ -1636,10 +1557,13 @@ var GameListing = React.createClass({
               case MOVES.PLAY_SHIFTER: {
                 var shipType = shipFromMove(move.type);
                 var label = shipLabels[shipType];
-
-                moveText = format("$1 placed a $2 at ($3)", username,
-                  label, move.to.join(', '));
-
+                moveText = format("$1 placed a $2 at ($3)", username, label, move.to.join(', '));
+              } break;
+              case MOVES.LOSE: {
+                moveText = format("$1 is out of the game.", username)
+              } break;
+              case MOVES.LOSE: {
+                moveText = format("Game over! $1 Wins!", username);
               } break;
               default: {
                 moveText = "UNKNOWN MOVE TYPE";
@@ -1660,12 +1584,14 @@ var GameListing = React.createClass({
       }
       return <table className="game-listing">
         <thead>
-          <td className="o-table-heading">
-            Playing with
-          </td>
-          <td className="o-table-heading">
-            Last move
-          </td>
+          <tr>
+            <td className="o-table-heading">
+              Playing with
+            </td>
+            <td className="o-table-heading">
+              Last move
+            </td>
+          </tr>
         </thead>
         <tbody>
           {gameRows}
@@ -1741,7 +1667,3 @@ function onPageLoad() {
   globalStore.subscribe(renderPage);
   renderPage();
 }
-
-
-/// TODO: Do data fetching based on react component life cycle as in http://notjoshmiller.com/ajax-polling-in-react-with-redux/
-

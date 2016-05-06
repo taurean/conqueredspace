@@ -25,6 +25,8 @@ var MOVES = {
   JOIN:            'JOIN',
   RESIGN:          'RESIGN',
   MOVE:            'MOVE',
+  LOSE:            'LOSE',
+  WIN:             'WIN',
   PLAY_MOTHERSHIP: 'PLAY_MOTHERSHIP',
   PLAY_SCOUT:      'PLAY_SCOUT',
   PLAY_SHIFTER:    'PLAY_SHIFTER',
