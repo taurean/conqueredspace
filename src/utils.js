@@ -172,6 +172,7 @@ function startLoop(simFn) {
 ///
 
 function eatEvent(e) { e.stopPropagation(); return false; }
+function defer(fn) { setTimeout(fn, 0); }
 
 function mapOver(src, mapping) {
   var target = [];

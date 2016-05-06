@@ -347,10 +347,10 @@ function refreshSession(store) {
 }
 function restoreSession(store) {
   var session;
+  var token = window.localStorage.getItem('sessionToken');
   try {
-    var token = window.localStorage.getItem('sessionToken');
     if (token) { session = JSON.parse(token); }
-  } catch(e) { console.err(e) }
+  } catch(e) { console.err(e); return; }
   var ok = session && getNow() < session.data.exp;
   if (ok) {
     store.dispatch({
@@ -388,10 +388,11 @@ function poll() {
       if (statusOK(status)) {
         try {
           var dashboardData = JSON.parse(data);
-          globalStore.dispatch(assign(dashboardData, { type: ACTIONS.POLL_SUCCESS }));
         } catch(e) {
           console.warn("could not parse dashboard data: ", e, data);
+          return;
         }
+        globalStore.dispatch(assign(dashboardData, { type: ACTIONS.POLL_SUCCESS }));
       } else {
         globalStore.dispatch({
           type: ACTIONS.POLL_FAILED,
@@ -540,37 +541,43 @@ var DashboardView = React.createClass({
       }
     }
 
-    var activeGames;
+    var gameCountLabel = null;
+    var gameListing;
     if (games && games.length) {
-      activeGames = (<section className="active-games">
-          <h3>Active games</h3>
-          <GameListing games={games} />
-        </section>);
+      gameCountLabel = (<span className="o-badge">{games.length}</span>);
+      gameListing = (<GameListing games={games} />);
     } else {
-      activeGames = null;
+      gameListing = (<p>No games found. You should start a new one!</p>);
+    }
+
+    var incomingRequestsSection = null;
+    var requests;
+    if (state.notifications && state.notifications.length) {
+      requests = state.notifications.filter(n => !n.read && n.notificationType == NOTIFICATIONS.GAME_REQUEST_RECEIVED);
+    }
+    if (requests && requests.length) {
+      incomingRequestsSection = (<section className="incoming-game-requests">
+          <h3>Incoming game requests <span className="o-badge">{requests.length}</span></h3>
+          <ol className="notification-list">
+            {mapOver(requests, n => (<li key={n.id}><Notification {...n} /></li>))}
+          </ol>
+        </section>);
     }
 
     return (
       <div>
         <div className="l-g2">
-          <section className="new-game">
-            <h3>Start a new game</h3>
-            <GameRequestForm onSubmit={this.requestGame} />
-          </section>
-          <section className="incoming-game-requests">
-            <h3>Incoming game requests</h3>
-            <ol className="notification-list">
-              {mapOver(state.notifications, function(n) {
-                var renderableNotification = !n.read && (n.notificationType.name == NOTIFICATIONS.GAME_REQUEST_ACCEPTED ||
-                  n.notificationType.name == NOTIFICATIONS.GAME_REQUEST_RECEIVED ||
-                  n.notificationType.name == NOTIFICATIONS.GAME_REQUEST_REJECTED);
-                return renderableNotification ? (<li key={n.id}><Notification {...n} /></li>) : null;
-              })}
-            </ol>
-          </section>
+          <section className="active-games">
+            <h3>Active games {gameCountLabel}</h3>
+            {gameListing}
+          </section> <div>
+            <section className="new-game">
+              <h3>Start a new game</h3>
+              <GameRequestForm onSubmit={this.requestGame} />
+            </section>
+            {incomingRequestsSection}
+          </div>
         </div>
-
-        {activeGames}
       </div>);
   }
 });
@@ -604,13 +611,14 @@ var AlphaCodeManagerView = React.createClass({
       if (statusOK(status)) {
         try {
           data = JSON.parse(data);
-          self.setState({
-            offset: newOffset,
-            rows: data,
-          });
         } catch(e) {
           console.error("Problem parsing fetched alpha codes, ", e)
+          return;
         }
+        self.setState({
+          offset: newOffset,
+          rows: data,
+        });
       }
 
       /// TODO: warn the user something went wrong.
@@ -716,13 +724,14 @@ var UserManagerView = React.createClass({
       if (statusOK(status)) {
         try {
           data = JSON.parse(data);
-          self.setState({
-            offset: newOffset,
-            rows: data,
-          });
         } catch(e) {
           console.error("Problem parsing fetched alpha codes, ", e)
+          return;
         }
+        self.setState({
+          offset: newOffset,
+          rows: data,
+        });
       }
 
       /// TODO: warn the user something went wrong.
@@ -984,9 +993,7 @@ function initRouteSystem(store, routes, specialRoutes) {
     for (var i = 0; i < segments.length; ++i) {
       var s = segments[i];
       if (s == '') { continue; }
-      if (! (s in currentNode.children)) {
-        currentNode.children[s] = { children: { } };
-      }
+      if (!(s in currentNode.children)) { currentNode.children[s] = { children: { } }; }
       currentNode = currentNode.children[s];
     }
     currentNode.value = routes[k];
@@ -1123,25 +1130,13 @@ var UserCreationForm = React.createClass({
     var self = this;
     event.preventDefault();
     POST(urls.users, this.state, function(status, data) {
-      if (statusOK(status)) {
-        console.log("user should be registered")
-        _logIn(globalStore, data);
-      } else if (status == 400) {
-        self.setState({
-          errors: JSON.parse(data)
-        });
-      } else {
-        console.log("Server error occured.");
-        self.setState({
-          errors: { form: ["The server encountered a problem."] }
-        });
-      }
-      console.log(arguments);
-    })
+      if (statusOK(status))   { _logIn(globalStore, data); }
+      else if (status == 400) { self.setState({ errors: JSON.parse(data) }); }
+      else                    { self.setState({ errors: { form: ["The server encountered a problem."] } }); }
+    });
     return false;
   },
   render: function() {
-    
     var errs = this.state.errors;
     if (! 'form'     in errs) errs['form']     = null;
     if (! 'email'    in errs) errs['email']    = null;
@@ -1382,12 +1377,8 @@ var GameRequestForm = React.createClass({
     }
     return <form className="gameRequestForm" onSubmit={this.handleSubmit}>
         <div className="input-button-group">
-          <LabelInputPair name="opponent" label="Opponent" onFocus={this.handleFocus}
-              onChange={this.handleChange}
-              onClick={eatEvent}
-              value={this.state.opponentName}
-              placeholder="........"
-              required />
+          <LabelInputPair name="opponentName" label="Opponent" value={this.state.opponentName} placeholder="........"
+            onFocus={this.handleFocus} onChange={this.handleChange} onClick={eatEvent} required="required" />
           <input className="o-btn" type="submit" value="challenge" />
         </div>
         {suggestions}
@@ -1520,6 +1511,7 @@ var Notification = React.createClass({
 });
 
 var GameListing = React.createClass({
+  goToGame: function(e) { changeRoute(globalStore, globalRouteTrie, 'games/' + e.currentTarget.getAttribute('data-id')); },
   render: function() {
     var games = this.props.games;
     if (games && games.length) {
@@ -1527,12 +1519,8 @@ var GameListing = React.createClass({
       for (var i = 0; i < games.length; ++i) {
         var game = games[i];
         var state = globalStore.getState();
-        var opponentName;
-        if (state.session.userId == game.playersInOrder[0]) {
-          opponentName = state.users[game.playersInOrder[1]].username;
-        } else {
-          opponentName = state.users[game.playersInOrder[0]].username;
-        }
+        var opponentIndex = state.session.userId == game.playersInOrder[0] ? 1 : 0;
+        var opponentName = state.users[game.playersInOrder[opponentIndex]].username;
 
         var moveText = '---';
         if (game.moves.length) {
@@ -1570,27 +1558,16 @@ var GameListing = React.createClass({
               }
           }
         }
-        gameRows.push(<tr className="table-row">
-            <td className="table-cell">
-              <span className="opponent-name">{opponentName}</span>
-            </td>
-            <td className="table-cell">
-              <span className="lastMove-move">{moveText}</span>
-            </td>
-            <td className="table-cell">
-              <RouteLink className="o-btn o-btn--small" path={"games/" + game.id}> go to game </RouteLink>
-            </td>
+        gameRows.push(<tr data-id={game.id} key={game.id} onClick={this.goToGame} className="table-row game-row">
+            <td className="table-cell opponent-name">{opponentName}</td>
+            <td className="table-cell lastMove-move">{moveText}</td>
           </tr>);
       }
       return <table className="game-listing">
         <thead>
           <tr>
-            <td className="o-table-heading">
-              Playing with
-            </td>
-            <td className="o-table-heading">
-              Last move
-            </td>
+            <td className="o-table-heading">Playing with</td>
+            <td className="o-table-heading">Last move</td>
           </tr>
         </thead>
         <tbody>
@@ -1600,29 +1577,6 @@ var GameListing = React.createClass({
     } else {
       return null;
     }
-  }
-});
-
-var GameRequestNotification = React.createClass({
-  acceptGameRequest: function() {
-    this.props.acceptGameRequest(this.props.parameters[1], this.props.notificationId);
-  },
-  rejectGameRequest: function() {
-    this.props.rejectGameRequest(this.props.parameters[1], this.props.notificationId);
-  },
-  render: function() {
-    var challanger = this.props.parameters[0];
-    return (<span>
-      {challanger} challenges you to a game.
-      <button onClick={this.acceptGameRequest}>Accept</button>
-      <button onClick={this.rejectGameRequest}>Reject</button>
-    </span>);
-  }
-})
-
-var Spinner = React.createClass({
-  render: function() {
-    return <span>You spin me right round baby, right round, like a record baby, right round round round </span>
   }
 });
 
@@ -1649,8 +1603,6 @@ var Page = React.createClass({
     return isSessionValid(this.props.store.getState().session) ? this.renderHomepage() : <AuthorizationView store={globalStore} />;
   }
 });
-
-function defer(fn) { setTimeout(fn, 0); }
 
 var pageInstance;
 function renderPage() {
