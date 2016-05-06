@@ -73,6 +73,7 @@ var renderAndUpdateGame = (function() {
 	return function update(r, input, game, dispatch) {
 		var i, v, ship, at;
 		if (!game.id) return;
+		var currentPlayer = getCurrentPlayer(game);
 
 		if (r.isDirty || input.dScrollAt[0] != 0 || input.dScrollAt[1] != 0) {
 			// is this a good idea?
@@ -126,25 +127,31 @@ var renderAndUpdateGame = (function() {
 			spotlightP = addV2(spotlightP, sclV2(negV2(tileFromPixel(mAt), spotlightP), 0.25));
 		}
 
-		function drawNestBottomLayer(ctx, userOrdinal, top) {
+		function drawNestBottomLayer(ctx, userOrdinal, top, active) {
 			var c = top ? -1 : 1;
 			var nest = game.playersInOrder[userOrdinal].nest;
 			ctx.fillStyle = playerColormap[userOrdinal]
 
+			var alpha = active ? 1 : 0.3;
+			var scale = active ? 1.2 : 1;
+
+			var originalAlpha = ctx.globalAlpha;
+			ctx.globalAlpha = alpha;
 			var i = 1;
 			for (var shipName in nest) {
-				if (nest[shipName] == 0) ctx.globalAlpha = 0.35;
+				if (nest[shipName] == 0) ctx.globalAlpha = alpha*0.5;
 				var v = centerOfTile([c*i, c*Math.floor(r.boardR/2)]);
-				constructHexagon(ctx, v, tileR*1.2);
+				constructHexagon(ctx, v, tileR*scale);
 				ctx.fill();
 
 				i += 2;
-				ctx.globalAlpha = 1;
+				ctx.globalAlpha = alpha;
 			}
+			ctx.globalAlpha = originalAlpha;
 		}
 
-		drawNestBottomLayer(r.ctx, 0, false);
-		drawNestBottomLayer(r.ctx, 1, true);
+		drawNestBottomLayer(r.ctx, 0, false, currentPlayer.order == 0);
+		drawNestBottomLayer(r.ctx, 1, true, currentPlayer.order == 1);
 
 		r.ctx.fillStyle = "white";
 		constructHexagon(r.ctx, centerOfTile(spotlightP), tileR*1.2);
@@ -158,6 +165,7 @@ var renderAndUpdateGame = (function() {
 				var v = centerOfTile(ship.pos);
 				constructHexagon(r.ctx, v, tileR*1.2);
 				r.ctx.fillStyle = playerColormap[ship.player];
+				r.ctx.globalAlpha = ship.player == currentPlayer.order ? 0.8 : 0.4;
 				r.ctx.fill();
 			}
 		}
@@ -256,8 +264,12 @@ var renderAndUpdateGame = (function() {
 
 
 
-		function drawUserForeground(ctx, player, top) {
+		function drawUserForeground(ctx, player, top, active) {
 			var c = top ? -1 : 1;
+
+			var alpha = active ? 1 : 0.5;
+			var originalAlpha = ctx.globalAlpha;
+			ctx.globalAlpha = alpha;
 
 			ctx.textBaseline = 'alphabetic';
 			ctx.textAlign = top ? 'left' : 'right';
@@ -265,7 +277,7 @@ var renderAndUpdateGame = (function() {
 			ctx.strokeStyle = playerColormap[player.order];
 			ctx.fillStyle = playerColormap[player.order];
 
-			ctx.lineWidth = 2;
+			ctx.lineWidth = active ? 3 : 1.5;
 			ctx.beginPath();
 
 			var p0 = _h[1];
@@ -293,7 +305,7 @@ var renderAndUpdateGame = (function() {
 			var nest = player.nest;
 			for (i = 0; i < game.ships.length; ++i) {
 				var shipName = game.ships[i];
-				if (nest[shipName] == 0) ctx.globalAlpha = 0.35;
+				if (nest[shipName] == 0) ctx.globalAlpha = alpha*0.5;
 				
 				v = centerOfTile([c*x, c*Math.floor(boardR/2)]);
 				ctx.fillStyle = playerColormap[player.order];
@@ -310,14 +322,17 @@ var renderAndUpdateGame = (function() {
 				ctx.fillStyle = playerColormap[player.order];
 				ctx.fill();
 				ctx.fillStyle = 'black';
+				ctx.globalAlpha = 1;
 				ctx.fillText("" + nest[shipName], v[0], v[1]);
 				
 				x += 2;
-				ctx.globalAlpha = 1;
+				ctx.globalAlpha = alpha;
 			}
+
+			ctx.globalAlpha = originalAlpha;
 		}
 
-		drawUserForeground(r.ctx, game.playersInOrder[0], false);
-		drawUserForeground(r.ctx, game.playersInOrder[1], true);
+		drawUserForeground(r.ctx, game.playersInOrder[0], false, currentPlayer.order == 0);
+		drawUserForeground(r.ctx, game.playersInOrder[1], true, currentPlayer.order == 1);
 	}
 })();

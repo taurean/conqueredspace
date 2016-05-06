@@ -148,6 +148,7 @@ ul, ol, li {
   height: .6rem;
   border-radius: .3rem;
   background: red;
+  animation: pulse 2s ease-out infinite;
 }
 .pollIndicator:after {
   content: '';
@@ -167,6 +168,12 @@ ul, ol, li {
   transform: rotateZ(360deg);
   transition: opacity .1s;
   opacity: 1;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 -0.2rem black, 0 0 1rem -0.2rem red; }
+  50% { box-shadow: 0 0 0 .5rem black, 0 0 .25rem .6rem rgba(255, 0, 0, 0.8); }
+  100% { box-shadow: 0 0 0 .6rem black, 0 0 .25rem .6rem rgba(255,0,0,0.6); }
 }
 
 .o-table-heading,
