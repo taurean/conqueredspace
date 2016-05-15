@@ -398,10 +398,8 @@ function poll() {
           type: ACTIONS.POLL_FAILED,
           errors: data
         });
-        if (status == 404 || status == 401) {
-          console.log("The current session seems not to be accepted by the server anymore. We let the user relog");
-          logOut(globalStore)
-        }
+
+        if (status == 404 || status == 401) logOut(globalStore);
       }
     },
     authHeader(state)
@@ -862,14 +860,15 @@ var TopBar = React.createClass({
       ];
     }
 
+    var commandCenterBacklink = this.props.pageName != "Command center" ? [<br />, <RouteLink className="o-menu-item" path="/">Back to command center</RouteLink>] : null;
     return (<div className="c-topbar">
       <div className="primary">
         <div>
           <span className="o-page-name">{this.props.pageName}</span>
-          { this.props.pageName != "Command center" ? [<br />, <RouteLink className="o-menu-item" path="/">Back to command center</RouteLink>] : null }
+          { commandCenterBacklink }
         </div>
         <h1 className="heading">
-          <canvas ref={updateLogoRenderTarget} className="logo-surface" width="100" height="100"></canvas>
+          <canvas ref={logoSystem.initialize} className="logo-surface" width="100" height="100"></canvas>
           <span className="heading-text">Conquered Space</span>
         </h1>
         <p className="hi">
@@ -892,30 +891,21 @@ var TopBar = React.createClass({
 })
 
 
-function noop(){}
 function authorize(state) {
   var session = state.session;
-  if (isSessionValid(session)) {
-    return;
-  } else {
-    return 'authorize';
-  }
+  if (isSessionValid(session)) return;
+  else                         return 'authorize';
 }
 function adminOnly(state, previous) {
   var session = state.session;
   if (isSessionValid(session)) {
-    if ((session.roles & roles.admin) > 0) {
-      return
-    } else {
-      return '';
-    }
+    if ((session.roles & roles.admin) > 0) return;
+    else return '';
   } else {
     return 'authorize';
   }
 }
-
-
-var onRouteEnter = { 
+var onRouteEnter = {
   '': noop,
   '/': noop,
   'games/*': authorize,
@@ -1293,7 +1283,7 @@ var AuthorizationView = React.createClass({
     }
     return <section className="v-authorization content">
         <h1 className="heading">
-          <canvas ref={updateLogoRenderTarget} className="logo-surface" width="100" height="100"></canvas>
+          <canvas ref={logoSystem.initialize} className="logo-surface" width="100" height="100"></canvas>
           <span className="heading-text">Conquered Space</span>
         </h1>
         { view }
@@ -1612,7 +1602,14 @@ function renderPage() {
 
 var globalStore = createStore(rootReduxer);
 function onPageLoad() {
-  initParticles();
+
+  var starSurface = document.getElementById('particle-surface');
+  starSystem.initialize(starSurface);
+
+  startLoop(function(input) {
+    starSystem.update(input);
+    logoSystem.update(input);
+  });
   initPollSystem(globalStore);
   initRouteSystem(globalStore);
   restoreSession(globalStore);

@@ -1,272 +1,264 @@
-function initParticles() {
-  var sectorWidth = 250;
-  var sectorHeight= 250;
-  var sectorDepth = 100;
+var starSystem = (function() {
 
-  var starDensity = 0.00025;
-  var starCount = Math.floor(sectorWidth*sectorHeight*starDensity);
-  var sectors = Array();
+  // I got this from the internet somehere and modified it slightly to deal with negative and zero seeds. It is janky
+  // as hell, but (barely) good enough for now.
+  function pseudoRandomGenerator(x, y, z) {
+    if (x == 0) x = 2824242;
+    if (y == 0) y = 3752057;
+    if (z == 0) z = 5710753;
 
-  var horSectorCenters;
-  var vertSectorCenters;
-  var horSectorCount;
-  var vertSectorCount;
-  var topLeftSector = [0, 0];
-  function generateSectors(){
-    horSectorCount = Math.ceil(w / sectorWidth) + 1;
-    vertSectorCount = Math.ceil(h / sectorHeight) + 1;
-    sectors = Array(horSectorCount);
-    horSectorCenters = Array(horSectorCount);
-    vertSectorCenters = Array(vertSectorCount);
-    for (var i = 0; i < horSectorCount; ++i) {
-      horSectorCenters[i] = sectorWidth*i;
-      sectors[i] = Array(vertSectorCount);
-      for(var j = 0; j < vertSectorCount; ++j) {
-        vertSectorCenters[j] = sectorHeight*j;
-        var s = sectors[i][j] = Array(starCount);
-        fillSector(s, starCount,
-          addV2(topLeftSector, [sectorWidth*i, sectorHeight*j]));
-      }
+    return function() {
+      x += (171 * x) % 30269;
+      y += (172 * y) % 30307;
+      z += (170 * z) % 30323;
+      return Math.abs(x/30269.0 + y/30307.0 + z/30323.0) % 1.0;
     }
   }
 
-  var shiftCount = 0;
-  function shiftLeft() {
-    var colIndex = mod(horSectorCount - 1 + topLeftSector[0]/sectorWidth, horSectorCount);
-    var resetCol = sectors[colIndex];
-    topLeftSector[0] -= sectorWidth;
-    horSectorCenters[colIndex] = topLeftSector[0];
-    for(var i = 0; i < vertSectorCount; ++i) {
-      fillSector(resetCol[i], starCount, [ horSectorCenters[colIndex], vertSectorCenters[i] ]);
-    }
-  }
-  function shiftRight() {
-    var colIndex = mod(topLeftSector[0]/sectorWidth, horSectorCount);
-    var resetCol = sectors[colIndex];
-    topLeftSector[0] += sectorWidth;
-    horSectorCenters[colIndex] = topLeftSector[0] + sectorWidth*(horSectorCount - 1);
-    for(var i = 0; i < vertSectorCount; ++i) {
-      fillSector(resetCol[i], starCount, [ horSectorCenters[colIndex], vertSectorCenters[i] ]);
-    }
-  }
-  function shiftUp() {
-    var rowIndex = mod(vertSectorCount - 1 + topLeftSector[1]/sectorHeight, vertSectorCount);
-    topLeftSector[1] -= sectorHeight;
-    vertSectorCenters[rowIndex] = topLeftSector[1];
-    for(var i = 0; i < horSectorCount; ++i) {
-      fillSector(sectors[i][rowIndex], starCount, [ horSectorCenters[i], vertSectorCenters[rowIndex] ]);
-    }
-  }
-  function shiftDown() {
-    var rowIndex = mod(topLeftSector[1]/sectorHeight, vertSectorCount);
-    topLeftSector[1] += sectorHeight;
-    vertSectorCenters[rowIndex] = sectorHeight*(vertSectorCount - 1) + topLeftSector[1];
-    for(var i = 0; i < horSectorCount; ++i) {
-      fillSector(sectors[i][rowIndex], starCount, [ horSectorCenters[i], vertSectorCenters[rowIndex]]);
-    }
-  }
+  var renderTarget, ctx;
+  var cameraP   = [0, 0, 0];
+  var cameraDP  = [0, 0, 0];
+  var sectorDim = [50, 50, 50];
+  var maxStarCountPerSector = 100;
 
-  function fillSector(sector, count, p) {
-    var rnd = pseudoRandomGenerator(p[0], p[1], 0);
-    for (var i = 0; i < count; ++i)
-      sector[i] = [
-        p[0] + (0.5 - rnd())*sectorWidth,
-        p[1] + (0.5 - rnd())*sectorHeight,
-        rnd()*rnd() ];
-  }
+  var avgStarRadius = 1.5;
+  var avgRadiusDeviation = 4;
+  var starPalette = [
+    "#B79AB2",
+    "#9D483D",
+    "#BF817B"
+  ];
+  var prevMDownT = 0;
+  function renderAndUpdateStars(input) {
 
-  var cameraP = [0, 0];
-  var cameraSpeed = [-20, 10];
-
-  var m = [0,0];
-  document.addEventListener('mousemove', function(e) {
-    m = [e.clientX, e.clientY];
-  });
-  var orientation = [0, 0, 0];
-  var orientationAnchor = [0, 0, 0];
-  var orientationMeasured = false;
-  window.addEventListener('deviceorientation', function initOrientation(e) {
-    if (e.gamma !== null) {
-      orientationMeasured = true;
-      if (!e.absolute) {
-        orientationAnchor = [e.alpha, e.beta, e.gamma];
-      }
-      window.removeEventListener('deviceorientation', initOrientation);
-      window.addEventListener('deviceorientation', function(e) {
-        orientation = [e.alpha, e.beta, e.gamma];
-      });
-    }
-  });
-
-  /// Initiation
-  var renderTarget = document.getElementById("particle-surface");
-  renderTarget.width = window.innerWidth;
-  renderTarget.height = window.innerHeight;
-  var w = renderTarget.width;
-  var h = renderTarget.height;
-  generateSectors();
-
-
-  var ctx = renderTarget.getContext('2d');
-  ctx.fillStyle = 'rgba(255,255,200,0.4)';
-
-  startLoop(function(input) {
-    var cameraDP = sclV2(cameraSpeed, input.dT / 1000);
-    cameraP = addV2(cameraP, cameraDP);
-    ctx.translate(-cameraDP[0], -cameraDP[1]);
-    var sectorOffset = negV2(cameraP, topLeftSector);
-    if (sectorOffset[0] <= -(sectorWidth/2)) 
-      shiftLeft();
-    else if (sectorOffset[0] >= (sectorWidth/2)) 
-      shiftRight();
-
-    var screenCenter = [w/2, h/2];
-    var cameraCenter = addV2(cameraP, screenCenter);
-
-    if (sectorOffset[1] <= -sectorHeight/2) 
-      shiftUp();
-    else if (sectorOffset[1] >= sectorHeight/2) 
-      shiftDown();
-
-    ctx.clearRect(cameraP[0], cameraP[1], w, h);
-    for (var i = 0; i < horSectorCount; ++i) {
-      // ctx.fillStyle = [
-      //   'rgba(255, 40, 40, 0.5)',
-      //   'rgba(40, 255, 40, 0.5)',
-      //   'rgba(40, 40, 255, 0.5)',
-      //   ][i%3]
-      for (var j = 0; j < vertSectorCount; ++j) {
-        var s = sectors[i][j];
-        for (var k = 0; k < starCount; ++k) {
-          ctx.beginPath();
-          var z = s[k][2];
-          var pZ = 2*(z - 0.5);
-          var pX = (cameraCenter[0] - s[k][0])/w*pZ*400;
-          var pY = (cameraCenter[1] - s[k][1])/h*pZ*400;
-          pX += (0.5 - m[0]/w)*pZ*100;
-          pY += (0.5 - m[1]/h)*pZ*100;
-          if (orientationMeasured) {
-            pX += (orientation[2] - orientationAnchor[2] + 90)/180*pZ*500;
-            pY += (orientation[1] - orientationAnchor[1] + 90)/180*pZ*500;
-          }
-          var x = s[k][0] - pX;
-          var y = s[k][1] - pY;
-          var r = z*starRadius;
-          ctx.arc(x, y, r, 0, TAU);
-
-          ctx.fillStyle = starColors[Math.floor(100*z) % 3];
-          ctx.fill();
-        }
-      }
+    if (input.viewportDirty) {
+      renderTarget.width = input.viewportDim[X];
+      renderTarget.height = input.viewportDim[Y];
     }
 
-    hexagons(input.t, input.dT);
-  });
-
-
-  var hexagons = (function() {
-    
-    var loadingT = false;
-    var loadingPercent = 0;
-
-    var renderTarget, ctx;
-    var r, w, h;
-    var schlafliSymbol = 6;
-    window.updateLogoRenderTarget = function(target) {
-      renderTarget = target;
-      if (target) {
-        ctx = renderTarget.getContext("2d");
-        w = renderTarget.width;
-        h = renderTarget.height;
-        ctx.strokeStyle = "red";
-        ctx.translate(w/2, h/2);
-        r = Math.min(w, h)/2;
-        ctx.scale(r, r);
-        ctx.lineWidth = 1/r;
-      }
+    var _cameraDP = [
+      -10*input.dMAt[X],
+      -10*input.dMAt[Y],
+      input.dScrollAt[Y]
+    ];
+    if (input.mDown) {
+      var mDownDT = input.t - prevMDownT;
+      if (2*input.dT < mDownDT && mDownDT < 300) _cameraDP[Z] = -500;
+      prevMDownT = input.t;
     }
 
-    function index(i) { return (i + schlafliSymbol) % schlafliSymbol; }
-    function hexagons(t, dt) {
-      if (!renderTarget) return;
+    var speedSq = dotV3(cameraDP, cameraDP);
+    if (input.mDown && dotV3(_cameraDP, _cameraDP) > 0 || _cameraDP[Z]) {
+      cameraDP = _cameraDP;
+    } else if (-10 < speedSq && speedSq < 10) {
+      cameraDP = [-2, 1, -2];
+    } else {
+      var cameraDDP = sclV3(cameraDP, -5);
+      cameraDP = addV3(cameraDP, sclV3(cameraDDP, input.dT/1000));
+    }
 
-      var i, j;
-      if (loadingPercent < 1) {
-        loadingPercent += dt/500;
+    cameraP = addV3(cameraP, sclV3(cameraDP, input.dT/1000));
 
-        ctx.clearRect(-w/2, -h/2, w, h);
-        ctx.moveTo(unityHexagon[0][0], unityHexagon[0][1]);
-        for (j = 0; j < schlafliSymbol; j++) {
-          ctx.beginPath();
-          var a = unityHexagon[index(j - 1)];
-          var b = unityHexagon[index(j)];
-          var ab = negV2(b, a);
+    var _cameraP = [
+      cameraP[X] + (0.5 - input.mAt[X]/input.viewportDim[X])*10,
+      cameraP[Y] + (0.5 - input.mAt[Y]/input.viewportDim[Y])*10,
+      cameraP[Z] //+ (input.scrollAt[Y]/100)
+    ];
 
-          ab = addV2(a, sclV2(ab, sqr(loadingPercent)));
+    var viewportHalfDim = sclV2(input.viewportDim, 0.5);
+    var viewVolumeNear = [ -viewportHalfDim[X],  viewportHalfDim[Y],  -10 ]; // z values pulled out of my ass.
+    var viewVolumeFar  = [  viewportHalfDim[X], -viewportHalfDim[Y], -200 ];
 
-          ctx.moveTo(a[0], a[1]);
-          ctx.lineTo(ab[0], ab[1]);
-          ctx.stroke();
-        }
-        // ctx.closePath();
-      } else {
-        if (!loadingT) {
-          loadingT = t;
-          document.body.className = "";
-          return;
-        }
+    var viewportTransform = [
+      viewportHalfDim[X], 0, 0, viewportHalfDim[X],
+      0, viewportHalfDim[Y], 0, viewportHalfDim[Y],
+      0, 0, 1, 0,
+      0, 0, 0, 1
+    ];
 
-        var stageCount = 6;
-        var bezierStages = Array(stageCount);
-        var d = (t - loadingT) / 1500; 
-        d = Math.min(d*d, 0.1)
-        bezierStages[0] = unityHexagon;
-        for (i = 1; i < stageCount; ++i) {
-            var stage = Array(schlafliSymbol);
-            for (var j = 0; j < schlafliSymbol; ++j) {
-                var a = bezierStages[i - 1][index(j - 1)];
-                var b = bezierStages[i - 1][index(j)];
-                var ab = negV2(b, a);
+    var n = -2;
+    var f = -200;
+    var fov = (120/360)*TAU;
+    var t = Math.tan(fov/2)*Math.abs(n);
+    var b = -t;
+    var r = (input.viewportDim[X]/input.viewportDim[Y])*t;
+    var l = -r;
 
-                stage[j] = addV2(a, sclV2(ab, d));
-            }
-            bezierStages[i] = stage;
-        }
+    var perspectiveTransform = [
+      n*2/(r - l),           0, (l + r)/(l - r),             0,
+                0, n*2/(t - b), (b + t)/(b - t),             0,
+                0,           0, (f + n)/(n - f), f*n*2/(f - n),
+                0,           0,               1,             0
+    ];
 
-        ctx.clearRect(-w/2, -h/2, w, h);
-        for (i = 0; i < stageCount; ++i) {
+    var cameraTransform = [
+      1, 0, 0, -_cameraP[X],
+      0, 1, 0, -_cameraP[Y],
+      0, 0, 1, -_cameraP[Z],
+      0, 0, 0,           1,
+    ];
+
+    var transform = mulM4x4M(mulM4x4M(viewportTransform, perspectiveTransform), cameraTransform);
+    ctx.clearRect(0, 0, input.viewportDim[X], input.viewportDim[Y]);
+
+    var sectorHalfDim = sclV4(sectorDim, 0.5);
+    // we only do AABB viewVolumes
+
+    var nearSector = [
+      Math.floor((_cameraP[X] + l)/sectorDim[X]) - 1.5,
+      Math.floor((_cameraP[Y] + b)/sectorDim[Y]) - 1.5,
+      Math.floor((_cameraP[Z] + n)/sectorDim[Z]) + 1.5,
+    ];
+    var farSector = [
+      Math.ceil((_cameraP[X] + r)/sectorDim[X]) + 1.5,
+      Math.ceil((_cameraP[Y] + t)/sectorDim[Y]) + 1.5,
+      Math.ceil((_cameraP[Z] + f)/sectorDim[Z]) - 1.5,
+    ];
+    for (var sectorX = nearSector[X]; sectorX <= farSector[X]; ++sectorX) {
+      for (var sectorY = nearSector[Y]; sectorY <= farSector[Y]; ++sectorY) {
+        for (var sectorZ = nearSector[Z]; sectorZ >= farSector[Z]; --sectorZ) {
+          var sectorP = [
+            sectorX*sectorDim[X],
+            sectorY*sectorDim[Y],
+            sectorZ*sectorDim[Z],
+            1
+          ];
+
+          ctx.globalAlpha = smoothstep(_cameraP[Z] + f, _cameraP[Z] + n, sectorP[Z]);
+
+          var sectorGenerator = pseudoRandomGenerator(sectorX, sectorY, sectorZ);
+          for (var i = 0; i < 2; ++i) {
+            var starP = addV4(sectorP, [
+              sectorGenerator()*sectorDim[X] - sectorHalfDim[X],
+              sectorGenerator()*sectorDim[Y] - sectorHalfDim[Y],
+              sectorGenerator()*sectorDim[Z] - sectorHalfDim[Z],
+              0
+            ]);
+            var starColor = starPalette[Math.floor(sectorGenerator()*starPalette.length)];
+
+            var starPInSpace = homogenizeV4(mulM4x4V(transform, starP));
+
+            var starSize = 0; // what's a reasonable value for this?
+            for (var j = 0; j < avgStarRadius*avgRadiusDeviation; ++j) starSize += sectorGenerator();
+            starSize /= avgRadiusDeviation;
+
+            if (starP[Z] > _cameraP[Z] + n) continue;
+            starSize = homogenizeV4(mulM4x4V(transform, [starP[X] + starSize, 0, starP[Z], 1]))[X] - starPInSpace[X];
+
             ctx.beginPath();
-            ctx.moveTo(bezierStages[i][0][0], bezierStages[i][0][1]);
-            for (j = 1; j < schlafliSymbol; j++) {
-                ctx.lineTo(bezierStages[i][index(j)][0], bezierStages[i][index(j)][1]);
-            }
+            ctx.arc(starPInSpace[X], starPInSpace[Y], starSize, 0, TAU);
             ctx.closePath();
-            ctx.stroke();
+            ctx.fillStyle = starColor;
+            ctx.fill();
+          }
+
         }
       }
     }
 
-    return hexagons;
-  })();
-}
-
-var starRadius = 3;
-var starColors = [
-  "#B79AB2",
-  "#9D483D",
-  "#BF817B"
-];
-
-function pseudoRandomGenerator(x, y, z) {
-  if (x == 0) x = 2824242;
-  if (y == 0) y = 3752057;
-  if (z == 0) z = 5710753;
-
-  return function() {
-    x += (171 * x) % 30269;
-    y += (172 * y) % 30307;
-    z += (170 * z) % 30323;
-    return (x/30269.0 + y/30307.0 + z/30323.0) % 1.0;
   }
-}
 
+  function initialize(_renderTarget) {
+    renderTarget = _renderTarget;
+    ctx = renderTarget.getContext('2d');
+  }
+
+  return {
+    initialize: initialize,
+    update: renderAndUpdateStars
+  };
+})();
+
+
+var logoSystem = (function() {
+  var ctx, renderTarget;
+  var dim, halfDim, r;
+
+  var vertCount = 6;
+  var unitPolygon = Array(vertCount);
+  var stageCount = vertCount;
+  var bezierStages = Array(stageCount);
+  function index(i) { return (i + vertCount) % vertCount; }
+
+
+  for (var i = 0; i < vertCount; ++i) {
+    unitPolygon[i] = [Math.cos(TAU*i/vertCount), Math.sin(TAU*i/vertCount)];
+    bezierStages[i] = Array(vertCount);
+  }
+  bezierStages[0] = unitPolygon;
+
+  var loadingT = false;
+  var loadingPercent = 0;
+
+
+  function initialize(_renderTarget) {
+    renderTarget = _renderTarget;
+    if (!renderTarget) return;
+
+    ctx = renderTarget.getContext('2d');
+    dim = [renderTarget.width, renderTarget.height];
+    halfDim = sclV2(dim, 0.5);
+    r = 0.5*Math.min(dim[X], dim[Y]) ;
+
+    ctx.translate(halfDim[X], halfDim[Y]);
+    ctx.scale(r, r);
+    ctx.lineWidth = 1/r;
+
+    ctx.strokeStyle = 'red';
+  }
+
+  function update(input) {
+    if (!renderTarget) return;
+
+    var i, j;
+    if (loadingPercent < 1) {
+      loadingPercent += input.dT/500;
+
+      ctx.clearRect(-halfDim[X], -halfDim[Y], dim[X], dim[Y]);
+      ctx.moveTo(unitPolygon[0][0], unitPolygon[0][1]);
+      for (j = 0; j < vertCount; j++) {
+        ctx.beginPath();
+        var a = unitPolygon[index(j - 1)];
+        var b = unitPolygon[index(j)];
+        var ab = lerpV2(a, b, sqr(loadingPercent));
+
+        ctx.moveTo(a[0], a[1]);
+        ctx.lineTo(ab[0], ab[1]);
+        ctx.stroke();
+      }
+    } else {
+      if (!loadingT) {
+        loadingT = input.t;
+        document.body.className = "";
+        return;
+      }
+
+      var d = (input.t - loadingT)/1500;
+      d = Math.min(d*d, 0.1)
+      if (d <= 1) {
+        for (i = 1; i < stageCount; ++i) {
+          for (j = 0; j < vertCount; ++j) {
+            var a = bezierStages[i - 1][index(j - 1)];
+            var b = bezierStages[i - 1][index(j)];
+            bezierStages[i][j] = lerpV2(a, b, d);
+          }
+        }
+      }
+
+      ctx.clearRect(-halfDim[X], -halfDim[Y], dim[X], dim[Y]);
+      for (i = 0; i < stageCount; ++i) {
+        ctx.beginPath();
+        ctx.moveTo(bezierStages[i][0][0], bezierStages[i][0][1]);
+        for (j = 1; j < vertCount; j++)
+          ctx.lineTo(bezierStages[i][index(j)][0], bezierStages[i][index(j)][1]);
+
+        ctx.closePath();
+        ctx.stroke();
+      }
+    }
+  }
+  return {
+    initialize: initialize,
+    update: update,
+  };
+})();

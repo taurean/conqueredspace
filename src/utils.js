@@ -72,23 +72,37 @@ function startLoop(simFn) {
   window.addEventListener("resize", markViewportDirty);
   
   var doc = document.documentElement;
-  var scrollAt;
-  var prevScrollAt = [0, 0];
-  var scrollDirty = true;
-  function markScrollDirty() { scrollDirty = true; }
-  window.addEventListener("scroll", markScrollDirty);
+  var scrollAt = [0, 0, 0];
+  var scrollDelta = [0, 0, 0];
+  function markScrollDirty(e) {
+    scrollDelta[X] += e.deltaX;
+    scrollDelta[Y] += e.deltaY;
+    scrollDelta[Z] += e.deltaZ;
+    console.log("scrolled", scrollDelta);
+  }
+  window.addEventListener("wheel", markScrollDirty);
 
   var mAt = [0, 0];
   var prevMAt = [0, 0];
   function updateMAt(e) { mAt = [e.clientX, e.clientY]; }
   window.addEventListener("mousemove", updateMAt);
+  window.addEventListener("touchmove", function(e) {
+    mAt = [
+      e.touches[0].clientX,
+      e.touches[0].clientY
+    ];
+  });
 
+  var isMDown = false;
   var mDowns = [];
   var mUps = [];
-  function registerMDown(e) { mDowns.push([e.clientX, e.clientY]); }
-  function registerMUp(e) { mUps.push([e.clientX, e.clientY]); }
+  function registerMDown(e) { mDowns.push([e.clientX, e.clientY]); isMDown = true; }
+  function registerMUp(e) { mUps.push([e.clientX, e.clientY]); isMDown = false; }
   window.addEventListener("mousedown", registerMDown);
   window.addEventListener("mouseup", registerMUp);
+
+  window.addEventListener("touchstart", function(e) { isMDown = true; });
+  window.addEventListener("touchend", function(e) { isMDown = false; });
 
 
   var orientation = [0, 0, 0];
@@ -113,24 +127,20 @@ function startLoop(simFn) {
   }
   function loop(t) {
 
-    if (scrollDirty) {
-      scrollAt = [(window.pageXOffset || doc.scrollLeft) - (doc.clientLeft || 0),
-        (window.pageYOffset || doc.scrollTop)  - (doc.clientTop || 0)];
-    }
-
     if (viewportDirty) {
       viewportDim = [document.body.clientWidth, document.body.clientHeight];
     }
+    scrollAt = addV2(scrollAt, scrollDelta);
 
     var input = {
       orientation: orientation,
       dOrientation: negV3(orientation, prevOrientation),
 
+      mDown: isMDown,
       mAt: mAt,
       dMAt: negV2(mAt, prevMAt),
-      scrollDirty: scrollDirty,
       scrollAt: scrollAt,
-      dScrollAt: negV2(scrollAt, prevScrollAt),
+      dScrollAt: scrollDelta,
       mDowns: mDowns,
       mUpts: mUps,
 
@@ -143,8 +153,7 @@ function startLoop(simFn) {
 
     prevT = t;
     prevMAt = mAt;
-    scrollDirty = false;
-    prevScrollAt = scrollAt;
+    scrollDelta = [0, 0, 0];
     mDowns = [];
     mUps = [];
     prevOrientation = orientation;
@@ -166,11 +175,17 @@ function startLoop(simFn) {
   }
 }
 
+// window.refreshHz = 0.5;
+// window.requestAnimationFrame = function(loop) {
+//   return setTimeout(loop.bind(window, Date.now()), 1000/refreshHz);
+// }
+// window.cancelAnimationFrame = function(h) { window.clearTimeout(); }
 
 ///
 /// Misc
 ///
 
+function noop(){}
 function eatEvent(e) { e.stopPropagation(); return false; }
 function defer(fn) { setTimeout(fn, 0); }
 
