@@ -529,51 +529,79 @@ var DashboardView = React.createClass({
 
   render: function() {
     var state = globalStore.getState();
-    var games;
+    var finishedGames = [];
+    var activeGames = [];
     var gameIds = state.session.gameIds;
     if (gameIds && gameIds.length) {
-      games = Array()
       for (var i = 0; i < gameIds.length; ++i) {
         var g = state.games[gameIds[i]];
-        if (g.started) { games.push(g); }
+        if (g.started) {
+          if (g.ended) finishedGames.push(g);
+          else         activeGames.push(g);
+        }
       }
     }
 
-    var gameCountLabel = null;
-    var gameListing;
-    if (games && games.length) {
-      gameCountLabel = (<span className="o-badge">{games.length}</span>);
-      gameListing = (<GameListing games={games} />);
+    var activeGameCountLabel = null;
+    var activeGameListing;
+    if (activeGames.length) {
+      activeGameCountLabel = (<span className="o-badge">{activeGames.length}</span>);
+      activeGameListing = (<GameListing games={activeGames} />);
     } else {
-      gameListing = (<p>No games found. You should start a new one!</p>);
+      activeGameListing = (<p>No games found. You should start a new one!</p>);
+    }
+
+    var finishedGameListing = null;
+    if (finishedGames.length) {
+      finishedGameListing = (<section className="finished-games">
+          <h3>Finished <span className="o-badge">{finishedGames.length}</span></h3>
+          <GameListing games={finishedGames} />
+        </section>);
     }
 
     var incomingRequestsSection = null;
     var requests;
-    if (state.notifications && state.notifications.length) {
-      requests = state.notifications.filter(n => !n.read && n.notificationType == NOTIFICATIONS.GAME_REQUEST_RECEIVED);
+    if (state.notifications) {
+      requests = [];
+      for (var id in state.notifications) {
+        var n = state.notifications[id];
+        if (!n.read && n.notificationType.name == NOTIFICATIONS.GAME_REQUEST_RECEIVED)
+          requests.push(<Notification {...n} />);
+      }
     }
     if (requests && requests.length) {
       incomingRequestsSection = (<section className="incoming-game-requests">
           <h3>Incoming game requests <span className="o-badge">{requests.length}</span></h3>
-          <ol className="notification-list">
-            {mapOver(requests, n => (<li key={n.id}><Notification {...n} /></li>))}
-          </ol>
+          <table className="o-table notification-list">
+            <thead>
+              <tr>
+                <th className="o-table-heading">Message</th>
+                <th className="o-table-heading">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {requests}
+            </tbody>
+          </table>
         </section>);
     }
 
     return (
       <div>
         <div className="l-g2">
-          <section className="active-games">
-            <h3>Active games {gameCountLabel}</h3>
-            {gameListing}
-          </section> <div>
+          <div>
+            <section className="active-games">
+              <h3>Active games {activeGameCountLabel}</h3>
+              {activeGameListing}
+            </section>
+            {finishedGameListing}
+          </div>
+          <div>
+            {incomingRequestsSection}
             <section className="new-game">
               <h3>Start a new game</h3>
               <GameRequestForm onSubmit={this.requestGame} />
             </section>
-            {incomingRequestsSection}
           </div>
         </div>
       </div>);
@@ -662,9 +690,9 @@ var AlphaCodeManagerView = React.createClass({
         username: "---",
         email: "---",
       };
-      var className = "";
+      var className = "o-table-cell";
       if (!r.user) { className += " empty"; }
-      renderedRows[i] = (<tr>
+      renderedRows[i] = (<tr className="o-table-row">
           <td>{r.generated}</td>
           <td>{r.alphaCode}</td>
           <td className={className}>{u.created}</td>
@@ -678,7 +706,7 @@ var AlphaCodeManagerView = React.createClass({
       <a className="o-btn o-btn--inline" onClick={this._refresh}>Refresh</a>
       <a className="o-btn o-btn--inline" onClick={this._nextPage}>&gt;</a> 
       <a className="o-btn o-btn--inline" onClick={this._newCode}>+</a> 
-      <table className="alpha-codes">
+      <table className="o-table alpha-codes">
         <thead>
           <tr>
           <td className="o-table-heading">Generated</td>
@@ -811,13 +839,13 @@ var UserManagerView = React.createClass({
       var dU = this.state.editValues[u.id] || {};
       dU = assign({}, u, dU);
 
-      renderedRows[i] = (<tr key={u.id}>
-          <td>{u.created}</td>
-          <td><input name={u.id + ".username"} className={"o-input " + (dU.username != u.username ? '--changed' : '')} onChange={this.changeField} value={dU.username} /></td>
-          <td><input name={u.id + ".email"}    className={"o-input " + (dU.email != u.email ? '--changed' : '')} onChange={this.changeField} value={dU.email} type="email" /></td>
-          <td><input name={u.id + ".verified"} className={"o-input " + (dU.roles & roles.user != u.roles & roles.user ? '--changed' : '')} onChange={this.changeField} type="checkbox" checked={dU.roles & roles.user} /></td>
-          <td><input name={u.id + ".admin"}    className={"o-input " + (dU.roles & roles.admin != u.roles & roles.admin ? '--changed' : '')} onChange={this.changeField} type="checkbox" checked={dU.roles & roles.admin} /></td>
-          <td><input name={u.id + ".password"} className={"o-input " + (dU.password ? '--changed' : '')} onChange={this.changeField} value={dU.password} type="password" /></td>
+      renderedRows[i] = (<tr key={u.id} className="o-table-row">
+          <td className="o-table-cell">{u.created}</td>
+          <td className="o-table-cell"><input name={u.id + ".username"} className={"o-input " + (dU.username != u.username ? '--changed' : '')} onChange={this.changeField} value={dU.username} /></td>
+          <td className="o-table-cell"><input name={u.id + ".email"}    className={"o-input " + (dU.email != u.email ? '--changed' : '')} onChange={this.changeField} value={dU.email} type="email" /></td>
+          <td className="o-table-cell"><input name={u.id + ".verified"} className={"o-input " + (dU.roles & roles.user != u.roles & roles.user ? '--changed' : '')} onChange={this.changeField} type="checkbox" checked={dU.roles & roles.user} /></td>
+          <td className="o-table-cell"><input name={u.id + ".admin"}    className={"o-input " + (dU.roles & roles.admin != u.roles & roles.admin ? '--changed' : '')} onChange={this.changeField} type="checkbox" checked={dU.roles & roles.admin} /></td>
+          <td className="o-table-cell"><input name={u.id + ".password"} className={"o-input " + (dU.password ? '--changed' : '')} onChange={this.changeField} value={dU.password} type="password" /></td>
         </tr>);
     }
     return (<form onSubmit={noop}>
@@ -825,7 +853,7 @@ var UserManagerView = React.createClass({
       <a className="o-btn o-btn--inline" onClick={this._refresh}>Refresh</a>
       <a className="o-btn o-btn--inline" onClick={this._nextPage}>&gt;</a> 
       <a className="o-btn o-btn--inline" onClick={this._newCode}>+</a> 
-      <table className="alpha-codes">
+      <table className="o-table alpha-codes">
         <thead>
           <tr>
           <td className="o-table-heading">Created</td>
@@ -1457,7 +1485,7 @@ var Notification = React.createClass({
 
     var content = null;
     var type = props.notificationType.name;
-    var classes = format("notification notification--$1 notification--$2",
+    var classes = format("o-table-row notification-row notification notification--$1 notification--$2",
       type, props.read ? "read" : "unread");
 
     var messageFormat = notificationMessages[props.notificationType.version][type];
@@ -1465,15 +1493,17 @@ var Notification = React.createClass({
     var markReadButton = (<button className="o-btn o-btn--inline" onClick={this.markNotificationRead}>Mark read</button>);
     switch (type) {
       case 'GAME_REQUEST_RECEIVED': {
-        content = (<div className={classes}>
-            {format(messageFormat, idToUsername(state, props.parameters[1]))}
-            <button className="o-btn o-btn--inline" onClick={this.acceptGameRequest}>Accept</button>
-            <button className="o-btn o-btn--inline" onClick={this.rejectGameRequest}>Reject</button>
-          </div>);
+        content = (<tr className={classes}>
+            <td className="o-table-cell">{format(messageFormat, idToUsername(state, props.parameters[1]))}</td>
+            <td className="o-table-cell notification-actions">
+              <button className="o-btn o-btn--inline" onClick={this.acceptGameRequest}>Accept</button>
+              <button className="o-btn o-btn--inline" onClick={this.rejectGameRequest}>Reject</button>
+            </td>
+          </tr>);
       } break;
       case 'GAME_REQUEST_REJECTED': {
         message = format(messageFormat, idToUsername(state, props.parameters[1]))
-        content = (<div className={classes}>{message} {markReadButton}</div>);
+        content = (<tr className={classes}>{message} {markReadButton}</tr>);
       } break;
 
       case 'GAME_REQUEST_ACCEPTED':
@@ -1548,12 +1578,12 @@ var GameListing = React.createClass({
               }
           }
         }
-        gameRows.push(<tr data-id={game.id} key={game.id} onClick={this.goToGame} className="table-row game-row">
-            <td className="table-cell opponent-name">{opponentName}</td>
-            <td className="table-cell lastMove-move">{moveText}</td>
+        gameRows.push(<tr data-id={game.id} key={game.id} onClick={this.goToGame} className="o-table-row game-row">
+            <td className="o-table-cell opponent-name">{opponentName}</td>
+            <td className="o-table-cell lastMove-move">{moveText}</td>
           </tr>);
       }
-      return <table className="game-listing">
+      return <table className="o-table game-listing">
         <thead>
           <tr>
             <td className="o-table-heading">Playing with</td>

@@ -21,7 +21,7 @@ var starSystem = (function() {
   var sectorDim = [50, 50, 50];
   var maxStarCountPerSector = 100;
 
-  var avgStarRadius = 1.5;
+  var avgStarRadius = 1;
   var avgRadiusDeviation = 4;
   var starPalette = [
     "#B79AB2",

@@ -25,7 +25,6 @@ function crossV4(v1, v2) { return [ v1[X]*v2[X], v1[Y]*v2[Y], v1[Z]*v2[Z], v1[W]
 
 function floorV4(v) { return [ Math.floor(v[X]), Math.floor(v[Y]), Math.floor(v[Z]), Math.floor(v[W]) ]; }
 
-// Slow as fuck linear algebra! :D
 // an M4x4 is just 1d array laid out as follows:
 /*
 [  0,  1,  2,  3,

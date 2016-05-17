@@ -178,7 +178,7 @@ function gameReduxer(state, action) {
     } break;
     case GAME_ACTIONS.SELECT_SHIP: {
       return assign({}, state, { playSlots: getMoveSlots(state.spatialMap, action.at),
-        selectedShip: state.spatialMap[action.at[0]][action.at[1]][0] });
+        selectedShip: state.spatialMap[action.at[X]][action.at[Y]][0] });
     } break;
     case GAME_ACTIONS.SELECT_FROM_NEST: {
       var p = state.playersInOrder[action.playerOrdinal];
@@ -202,21 +202,55 @@ function gameReduxer(state, action) {
       correctTurnOffset(newState);
       return newState;
     } break;
+
+
+    // Note that in both MOVE and PUT, there is some array manipulation that may look a bit expensive (O(n)), but we
+    // can assume that the arrays are usually very short. The most common case would be an array with just one element
+    // and the absolute worst case (with some new ship types added) would probably be something like 3 per player + 1.
     case GAME_ACTIONS.MOVE: {
       var newState = assign({ }, state);
       newState.turnCount++;
       correctTurnOffset(newState);
-      movePiece(newState, action.from, action.to);
+
+      var tX =   action.to[X], tY =   action.to[Y];
+      var fX = action.from[X], fY = action.from[Y];
+      var newMap = assign({}, newState.spatialMap);
+      if (!newMap[fX] || !newMap[fX][fY] || !newMap[fX][fY].length)
+        invalidCodePath();
+
+
+      var shipStack = [assign({}, newMap[fX][fY][0], { pos: action.to })];
+      newMap[tX] = assign({}, newMap[tX]);
+      newMap[fX][fY] = newMap[fX][fY].slice(1);
+      if (newMap[tX][tY]) shipStack = shipStack.concat(newMap[tX][tY]);
+      newMap[tX][tY] = shipStack;
+      if (!newMap[fX][fY].length) delete newMap[fX][fY];
+      if (!Object.keys(newMap[fX]).length) delete newMap[fX];
+
+      newState.spatialMap = newMap;
       return newState;
     } break;
     case GAME_ACTIONS.PUT: {
       var newState = assign({ }, state);
       var player = getCurrentPlayer(newState);
       player.nest[action.shipType]--;
-      putPiece(newState, action.to, action.shipType, player.order);
 
       newState.turnCount++;
       correctTurnOffset(newState);
+
+      var tX = action.to[X], tY = action.to[Y];
+      var piece = { player: player.order, type: action.shipType, pos: action.to };
+      newState.pieces = newState.pieces.concat([piece]);
+
+      var newMap = assign({}, newState.spatialMap);
+      var column = assign({}, newMap[tX]);
+      var cell = column[tY];
+      cell = cell ? [piece].concat(cell) : [piece];
+
+      column[tY] = cell;
+      newMap[tX] = column;
+      newState.spatialMap = newMap;
+
       return newState;
     } break;
     case GAME_ACTIONS.PASS: {
@@ -229,23 +263,6 @@ function gameReduxer(state, action) {
       return state;
     }
   }
-}
-
-function putPiece(game, to, shipType, player) {
-  var piece = { player: player, type: shipType, pos: to };
-  game.pieces.push(piece);
-  if (!game.spatialMap[to[0]]) game.spatialMap[to[0]] = { };
-  if (!game.spatialMap[to[0]][to[1]]) game.spatialMap[to[0]][to[1]] = [ ];
-  game.spatialMap[to[0]][to[1]].unshift(piece);
-}
-function movePiece(game, from, to) {
-  if (!game.spatialMap[from[0]] || !game.spatialMap[from[0]][from[1]] || !game.spatialMap[from[0]][from[1]].length) return;
-  if (!game.spatialMap[to[0]]) game.spatialMap[to[0]] = { };
-  if (!game.spatialMap[to[0]][to[1]]) game.spatialMap[to[0]][to[1]] = [ ];
-  game.spatialMap[to[0]][to[1]].unshift(game.spatialMap[from[0]][from[1]].shift());
-  game.spatialMap[to[0]][to[1]][0].pos = to;
-  if (!game.spatialMap[from[0]][from[1]].length) delete game.spatialMap[from[0]][from[1]];
-  if (!Object.keys(game.spatialMap[from[0]]).length) delete game.spatialMap[from[0]];
 }
 
 function correctTurnOffset(game) {

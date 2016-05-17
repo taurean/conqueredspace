@@ -179,10 +179,29 @@ ul, ol, li {
   100% { box-shadow: 0 0 0 .6rem black, 0 0 .25rem .6rem rgba(255,0,0,0.6); }
 }
 
+.o-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 1.8rem;
+}
+  .o-table-row {
+    border-bottom: 0.1rem solid rgba(255, 0, 0, 0.15);
+    cursor: pointer;
+    position: relative;
+    transition: background .125s ease-in, border .125s .05s ease;
+    background: rgba(255, 0, 0, 0);
+  }
+  .o-table-row:hover {
+    background: rgba(255, 0, 0, 0.15);
+    border-color: rgba(255, 0, 0, 0.5);
+  }
+
+  .o-table-cell { padding: 1.2rem; }
+
 .o-table-heading,
 .o-label{
+  text-align: left;
   color: rgba(white, 0.3);
-  display: block;
   font-family: $font-stack-sans-SC;
   font-size: 1.8rem;
   font-weight: 500;
@@ -192,9 +211,9 @@ ul, ol, li {
   text-transform: lowercase;
 }
 
-.o-table-heading {
-  padding-bottom: 1.2rem;
-}
+.o-table-heading { padding-bottom: 1.2rem; }
+
+.o-label { display: block; }
 
 .label-input-pair,
 .input-button-group {
@@ -294,6 +313,8 @@ ul, ol, li {
   .o-btn--inline {
     display: inline-block;
     width: auto;
+    border: none;
+    text-shadow: none;
   }
 
 .o-badge {
@@ -384,6 +405,9 @@ ul, ol, li {
   color: red;
 }
 
+.notification-actions { padding: 0; text-align: right; }
+
+
 p {
   font: 400 1.4rem/1.4 $font-stack-serif;
 }
@@ -397,50 +421,12 @@ p {
 
 #pageBody { position: relative; }
 
-.notification-list {
-  list-style: none;
-  float: left;
-  position: relative;
-}
-
-.notification-list li:before {
-  content: '>';
-  font: 600 small monospace;
-  margin-right: 0.35rem;
-  display: inline;
-  color: blue;
-}
-.notification {
-  display: inline-block;
-  height: 1.5rem;
-}
-
 .alpha-codes {
   width: 100%;
 }
 
 .empty { color: rgba(white, 0.3); }
 
-.game-listing {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 1.8rem;
-}
-
-  .game-listing .table-cell {
-    padding: 1.2rem;
-  }
-.game-row {
-  border-bottom: 0.1rem solid rgba(255, 0, 0, 0.15);
-  cursor: pointer;
-  position: relative;
-  transition: background .125s ease-in, border .125s .05s ease;
-  background: rgba(255, 0, 0, 0);
-}
-.game-row:hover {
-  background: rgba(255, 0, 0, 0.15);
-  border-color: rgba(255, 0, 0, 0.5);
-}
 
 .game-link {
   padding: 0 0.2rem;
