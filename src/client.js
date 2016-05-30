@@ -1177,7 +1177,7 @@ var UserCreationForm = React.createClass({
         onChange={this.saveInputChange} errequired="required" />
       
       <LabelInputPair name="alpha_code" label="Access code" idPrefix={this.props.id}
-        placeholder=".... ...." type="email" errors={errs['alpha-code']} 
+        placeholder=".... ...." errors={errs['alpha-code']} 
         maxLength="8" minLength="8"
         onChange={this.saveInputChange} equired="required" />
       

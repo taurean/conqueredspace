@@ -193,7 +193,8 @@ function gameReduxer(state, action) {
         nest: assign({}, state.startShipCount)
       });
 
-      newState.playersInOrder.push(player);
+      // TODO: This is not pure.
+
       return newState;
     } break;
     case GAME_ACTIONS.RESIGN: {
@@ -219,7 +220,10 @@ function gameReduxer(state, action) {
         invalidCodePath();
 
 
-      var shipStack = [assign({}, newMap[fX][fY][0], { pos: action.to })];
+      var ship = assign({}, newMap[fX][fY][0], { pos: action.to });
+      newState.pieces[ship.ordinal] = ship;
+
+      var shipStack = [ship];
       newMap[tX] = assign({}, newMap[tX]);
       newMap[fX][fY] = newMap[fX][fY].slice(1);
       if (newMap[tX][tY]) shipStack = shipStack.concat(newMap[tX][tY]);
@@ -239,7 +243,7 @@ function gameReduxer(state, action) {
       correctTurnOffset(newState);
 
       var tX = action.to[X], tY = action.to[Y];
-      var piece = { player: player.order, type: action.shipType, pos: action.to };
+      var piece = { player: player.order, type: action.shipType, pos: action.to, ordinal: newState.pieces.length };
       newState.pieces = newState.pieces.concat([piece]);
 
       var newMap = assign({}, newState.spatialMap);

@@ -95,19 +95,19 @@ var renderAndUpdateGame = (function() {
 			interactionAt = tileFromPixel(mAt);
 			if (!game.hotTile || interactionAt[0] != game.hotTile[0] || interactionAt[1] != game.hotTile[1]) {
 				dispatch({ type: GAME_ACTIONS.MARK_HOT, at: interactionAt, t: input.t, interactionAt: input.interactionAt });
+				for (i = 0; i < game.playSlots.length; ++i) {
+					var slot = game.playSlots[i];
+					if (slot[0] == interactionAt[0] && slot[1] == interactionAt[1]) {
+						slotInteraction(slot, game.selectedShip);
+						return;
+					}
+				}
+
 				if (game.spatialMap[interactionAt[0]] && game.spatialMap[interactionAt[0]][interactionAt[1]]) {
 					dispatch({ type: GAME_ACTIONS.SELECT_SHIP, at: interactionAt });
 				} else if (Math.abs(interactionAt[1]) == Math.floor(boardR/2)) {
 					dispatch({ type: GAME_ACTIONS.SELECT_FROM_NEST, playerOrdinal: interactionAt[1] < 0 ? 1 : 0,
 						nestOrdinal: Math.floor(Math.abs(interactionAt[0]/2)) });
-				} else {
-					for (i = 0; i < game.playSlots.length; ++i) {
-						var slot = game.playSlots[i];
-						if (slot[0] == interactionAt[0] && slot[1] == interactionAt[1]) {
-							slotInteraction(slot, game.selectedShip);
-							break;
-						}
-					}
 				}
 			} else if (interactionAt[0] == game.hotTile[0] && interactionAt[1] == game.hotTile[1]) {
 				dispatch({ type: GAME_ACTIONS.MARK_COLD, t: input.t });
