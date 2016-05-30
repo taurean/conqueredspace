@@ -1,13 +1,3 @@
-/*
-///TODO:
-
-- Implement all notifications
-    - Game started
-    - Opponent accepted game
-    - Opponent moved
-    - Opponent resigned
-    - ...
-*/
 
 var roles = {
   user: 1 << 0,
@@ -77,9 +67,7 @@ var urls = {
   games: BASE_URL + 'games',
   gameMoves: (gid => [urls.games, gid, 'moves'].join('/')),
   gamePlayer: ((uid, gid) => [urls.games, gid, 'players', uid].join('/')),
-  sessions: BASE_URL + 'sessions',
-  notifications: BASE_URL + 'notifications',
-  notificationRead: (nid => [urls.notifications, nid, 'read'].join('/')),
+  sessions: BASE_URL + 'sessions'
 };
 
 
@@ -134,8 +122,6 @@ var ACTIONS = {
   LOG_IN_FAILED: "LOG_IN_FAILED",
   MAKE_MOVE: "MAKE_MOVE",
   MOVE_FAILED: "MOVE_FAILED",
-  MARK_READ: "MARK_READ",
-  MARKING_NOTIFICATION_FAILED: "MARKING_NOTIFICATION_FAILED",
 };
 
 var initialState = {
@@ -161,7 +147,6 @@ var initialState = {
     errors: []
   },
   errors: [],
-  notifications: {},
   users: {},
   userLookup: { children: {} },
   games: {},
@@ -206,10 +191,6 @@ function rootReduxer(state, action) {
 
     // normalize the data so it becomes easier to cross reference things later
     var k, o;
-    for (k in action.notifications) {
-      o = action.notifications[k]
-      newState.notifications[o.id] = o;
-    }
     for (k in action.games) {
       o = action.games[k]
       for (var kk in o.playersInOrder) {
@@ -224,7 +205,6 @@ function rootReduxer(state, action) {
     newState.session = assign({}, newState.session, {
       user: action.user,
       gameIds: mapOver(action.games, function(g) { return g.id; }),
-      unreadNotificationIds: mapOver(action.notifications, function(n) { return n.id; }),
     });
     return newState;
 
@@ -274,16 +254,9 @@ function rootReduxer(state, action) {
     return newState;
 
   case ACTIONS.REPLY_GAME_REQUEST_FAILED:
-  case ACTIONS.MARKING_NOTIFICATION_FAILED:
   case ACTIONS.MOVE_FAILED:
     var newState = assign({}, state);
     newState.errors.push(action.error);
-    return state;
-
-  case ACTIONS.MARK_READ:
-    // this is an optimistic action.
-    var newState = assign({}, state);
-    newState.notifications[action.id].read = true;
     return state;
 
   case ACTIONS.INVALIDATE_GAME_VIEW:
@@ -449,6 +422,33 @@ function requestGame(store, invitee) {
   }
 }
 
+function acceptOrRejectRequest(store, gameId, accept) {
+  var moveType = accept ? MOVES.JOIN : MOVES.RESIGN;
+  var self = this;
+
+  store.dispatch({
+    type: ACTIONS.REPLY_GAME_REQUEST,
+    moveType: moveType,
+    gameId: gameId
+  });
+  var state = store.getState();
+
+  POST(urls.gameMoves(gameId), {
+      type: moveType,
+      access_token: state.session.tokenString
+    }, function(status, data){
+      if (!statusOK(status)) {
+        store.dispatch({
+          type: ACTIONS.REPLY_GAME_REQUEST_FAILED,
+          gameId: gameId,
+          error: data
+        });
+      }
+    });
+}
+function acceptGameRequest(store, gameId) { acceptOrRejectRequest(store, gameId, true); }
+function rejectGameRequest(store, gameId) { acceptOrRejectRequest(store, gameId, false); }
+
 
 ///
 /// Routing
@@ -531,14 +531,14 @@ var DashboardView = React.createClass({
     var state = globalStore.getState();
     var finishedGames = [];
     var activeGames = [];
+    var unstartedGames = [];
     var gameIds = state.session.gameIds;
     if (gameIds && gameIds.length) {
       for (var i = 0; i < gameIds.length; ++i) {
         var g = state.games[gameIds[i]];
-        if (g.started) {
-          if (g.ended) finishedGames.push(g);
-          else         activeGames.push(g);
-        }
+        if (g.ended)        finishedGames.push(g);
+        else if (g.started) activeGames.push(g);
+        else                unstartedGames.push(g);
       }
     }
 
@@ -559,20 +559,40 @@ var DashboardView = React.createClass({
         </section>);
     }
 
+    /// TODO: FIX THIS WITHOUT NOTIFICATIONS
     var incomingRequestsSection = null;
     var requests;
-    if (state.notifications) {
-      requests = [];
-      for (var id in state.notifications) {
-        var n = state.notifications[id];
-        if (!n.read && n.notificationType.name == NOTIFICATIONS.GAME_REQUEST_RECEIVED)
-          requests.push(<Notification {...n} />);
+    if (unstartedGames && unstartedGames.length) {
+      requests = Array(unstartedGames.length);
+      for (i = 0; i < unstartedGames.length; ++i) {
+        var game = unstartedGames[i];
+        var hasJoined = false;
+        var opponentId;
+        for (var j = 0; j < game.moves.length && !hasJoined && opponentId == undefined; ++j) {
+          var m = game.moves[i];
+          var isOwnMove = m.playerId == state.session.playerId;
+          hasJoined = m.type == MOVES.JOIN && isOwnMove;
+          if (!isOwnMove) opponentId = m.playerId;
+        }
+
+        var opponent = state.users[opponentId];
+
+        if (hasJoined)
+          requests[i] = (<tr className="o-table-row">
+              <td className="o-table-cell">Waiting on <strong>{opponent.username}</strong> to join</td>
+            </tr>);
+        else
+          requests[i] = (<tr className="o-table-row">
+              <td className="o-table-cell"><strong>{opponent.username}</strong></td>
+              <td className="o-table-cell notification-actions">
+                <button className="o-btn o-btn--inline" onClick={() => acceptGameRequest(globalStore, game.id)}>Accept</button>
+                <button className="o-btn o-btn--inline" onClick={() => rejectGameRequest(globalStore, game.id)}>Reject</button>
+              </td>
+            </tr>);
       }
-    }
-    if (requests && requests.length) {
       incomingRequestsSection = (<section className="incoming-game-requests">
-          <h3>Incoming game requests <span className="o-badge">{requests.length}</span></h3>
-          <table className="o-table notification-list">
+          <h3>Game lobbies <span className="o-badge">{requests.length}</span></h3>
+          <table className="o-table lobby-list">
             <thead>
               <tr>
                 <th className="o-table-heading">Message</th>
@@ -1405,130 +1425,48 @@ var GameRequestForm = React.createClass({
   }
 });
 
-var NOTIFICATIONS = {
-  GAME_REQUEST_RECEIVED: "GAME_REQUEST_RECEIVED",
-  GAME_REQUEST_ACCEPTED: "GAME_REQUEST_ACCEPTED",
-  GAME_REQUEST_REJECTED: "GAME_REQUEST_REJECTED",
-  OPPONENT_PLAYED_PIECE: "OPPONENT_PLAYED_PIECE",
-  OPPONENT_MOVED_PIECE:  "OPPONENT_MOVED_PIECE",
-  OPPONENT_RESIGNED:     "OPPONENT_RESIGNED",
-}
+function textFromMove(move) {
+  var moveText = '---';
+  if (!move) return moveText;
 
-var notificationMessages = [
-  { //v0
-    GAME_REQUEST_RECEIVED: "$1 challenges you to a game.",
-    GAME_REQUEST_ACCEPTED: "$2 accepted your challenge.",
-    GAME_REQUEST_REJECTED: "$2 rejected your challenge.",
-    OPPONENT_PLAYED_PIECE: "$2 played a $3 at ($4, $5).",
-    OPPONENT_MOVED_PIECE:  "$2 moved a piecte from ($3, $4) to ($5, $6).",
-    OPPONENT_RESIGNED:     "$1 resigned.",
+  var player = globalStore.getState().users[move.playerId];
+  var username;
+  if (player) username = player.username;
+  else invalidCodePath();
+
+  switch (move.type) {
+    case MOVES.RESIGN: {
+      moveText = game.moves.length == 2 ? "$1 did not accept the challenge" : "$1 resigned";
+      moveText = format(moveText, username);
+    } break;
+    case MOVES.JOIN: {
+      moveText = game.moves.length == 1 ? "$1 created the game" : "$1 accepted the challenge";
+      moveText = format(moveText, username);
+    } break;
+    case MOVES.MOVE: {
+      moveText = "$1 moved a piece from ($2) to ($3)";
+      moveText = format(moveText, username, move.from.join(', '), move.to.join(', '));
+    } break;
+    case MOVES.PLAY_MOTHERSHIP:
+    case MOVES.PLAY_CRAWLER:
+    case MOVES.PLAY_SCOUT:
+    case MOVES.PLAY_HOPPER:
+    case MOVES.PLAY_SHIFTER: {
+      var shipType = shipFromMove(move.type);
+      var label = shipLabels[shipType];
+      moveText = format("$1 placed a $2 at ($3)", username, label, move.to.join(', '));
+    } break;
+    case MOVES.LOSE: {
+      moveText = format("$1 is out of the game.", username)
+    } break;
+    case MOVES.LOSE: {
+      moveText = format("Game over! $1 Wins!", username);
+    } break;
+    default: {
+      moveText = "UNKNOWN MOVE TYPE";
+    }
   }
-];
-
-var Notification = React.createClass({
-  __acceptOrRejectRequest: function(accept) {
-    var gameId = this.props.parameters[0];
-    var moveType = accept ? MOVES.JOIN : MOVES.RESIGN;
-    var self = this;
-
-    globalStore.dispatch({
-      type: ACTIONS.REPLY_GAME_REQUEST,
-      moveType: moveType,
-      gameId: gameId
-    });
-    var state = globalStore.getState();
-
-    POST(urls.gameMoves(gameId), {
-        type: moveType,
-        access_token: state.session.tokenString
-      }, function(status, data){
-        if (statusOK(status)) {
-          self.markNotificationRead();
-        } else {
-          globalStore.dispatch({
-            type: ACTIONS.REPLY_GAME_REQUEST_FAILED,
-            gameId: gameId,
-            error: data
-          });
-        }
-      });
-  },
-  acceptGameRequest: function() { this.__acceptOrRejectRequest(true); },
-  rejectGameRequest: function() { this.__acceptOrRejectRequest(false); },
-
-  markNotificationRead: function() {
-    var id = this.props.id;
-    globalStore.dispatch({ type: ACTIONS.MARK_READ, id: id });
-
-    var state = globalStore.getState();
-    PUT(urls.notificationRead(id), authPayload(state),
-      function(status, data) {
-        if (! statusOK(status)) {
-          globalStore.dispatch({
-            type: ACTIONS.MARKING_NOTIFICATION_FAILED,
-            id: id, error: data
-          });
-        }
-      });
-  },
-
-  render: function() {
-    var props = this.props;
-    var state = globalStore.getState();
-    function idToUsername(state, id) {
-      /// TODO: load user if not in cache.
-      var name = "UNKNOWN USER";
-      var user = state.users[id];
-      if (user) name = user.username;
-      return name;
-    }
-
-    var content = null;
-    var type = props.notificationType.name;
-    var classes = format("o-table-row notification-row notification notification--$1 notification--$2",
-      type, props.read ? "read" : "unread");
-
-    var messageFormat = notificationMessages[props.notificationType.version][type];
-    var message;
-    var markReadButton = (<button className="o-btn o-btn--inline" onClick={this.markNotificationRead}>Mark read</button>);
-    switch (type) {
-      case 'GAME_REQUEST_RECEIVED': {
-        content = (<tr className={classes}>
-            <td className="o-table-cell">{format(messageFormat, idToUsername(state, props.parameters[1]))}</td>
-            <td className="o-table-cell notification-actions">
-              <button className="o-btn o-btn--inline" onClick={this.acceptGameRequest}>Accept</button>
-              <button className="o-btn o-btn--inline" onClick={this.rejectGameRequest}>Reject</button>
-            </td>
-          </tr>);
-      } break;
-      case 'GAME_REQUEST_REJECTED': {
-        message = format(messageFormat, idToUsername(state, props.parameters[1]))
-        content = (<tr className={classes}>{message} {markReadButton}</tr>);
-      } break;
-
-      case 'GAME_REQUEST_ACCEPTED':
-      case 'OPPONENT_MOVED_PIECE':
-      case 'OPPONENT_PLAYED_PIECE':
-      case 'OPPONENT_RESIGNED': { } break; 
-      // {
-      //   var gamePath = 'games/' + props.parameters[0];
-
-      //   var formatArguments = [messageFormat].concat(props.parameters);
-      //   formatArguments[2] = idToUsername(state, props.parameters[1]);
-      //   message = format.apply(null, formatArguments);
-
-      //   content = (<div className={classes}>
-      //       {message} <RouteLink className="game-link" path={gamePath}>Go to game</RouteLink> {markReadButton}
-      //     </div>);
-      // } break;
-
-      default:
-        invalidCodePath();
-    }
-
-    return content;
-  },
-});
+}
 
 var GameListing = React.createClass({
   goToGame: function(e) { changeRoute(globalStore, globalRouteTrie, 'games/' + e.currentTarget.getAttribute('data-id')); },
@@ -1542,42 +1480,7 @@ var GameListing = React.createClass({
         var opponentIndex = state.session.userId == game.playersInOrder[0] ? 1 : 0;
         var opponentName = state.users[game.playersInOrder[opponentIndex]].username;
 
-        var moveText = '---';
-        if (game.moves.length) {
-          var move = peek(game.moves);
-          var username = state.users[move.playerId].username;
-          switch (move.type) {
-              case MOVES.RESIGN: {
-                moveText = game.moves.length == 2 ? "$1 did not accept the challenge" : "$1 resigned";
-                moveText = format(moveText, username);
-              } break;
-              case MOVES.JOIN: {
-                moveText = game.moves.length == 1 ? "$1 created the game" : "$1 accepted the challenge";
-                moveText = format(moveText, username);
-              } break;
-              case MOVES.MOVE: {
-                moveText = "$1 moved a piece from ($2) to ($3)";
-                moveText = format(moveText, username, move.from.join(', '), move.to.join(', '));
-              } break;
-              case MOVES.PLAY_MOTHERSHIP:
-              case MOVES.PLAY_SCOUT:
-              case MOVES.PLAY_HOPPER:
-              case MOVES.PLAY_SHIFTER: {
-                var shipType = shipFromMove(move.type);
-                var label = shipLabels[shipType];
-                moveText = format("$1 placed a $2 at ($3)", username, label, move.to.join(', '));
-              } break;
-              case MOVES.LOSE: {
-                moveText = format("$1 is out of the game.", username)
-              } break;
-              case MOVES.LOSE: {
-                moveText = format("Game over! $1 Wins!", username);
-              } break;
-              default: {
-                moveText = "UNKNOWN MOVE TYPE";
-              }
-          }
-        }
+        var moveText = textFromMove(peek(game.moves));
         gameRows.push(<tr data-id={game.id} key={game.id} onClick={this.goToGame} className="o-table-row game-row">
             <td className="o-table-cell opponent-name">{opponentName}</td>
             <td className="o-table-cell lastMove-move">{moveText}</td>
